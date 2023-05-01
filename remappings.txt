@@ -1,0 +1,6 @@
+ds-test/=lib/forge-std/lib/ds-test/src/
+erc-3525/=lib/erc-3525/contracts/
+forge-std/=lib/forge-std/src/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@prb/test/=lib/prb-test/src/
