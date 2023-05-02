@@ -18,7 +18,7 @@ contract _PFPDAOTest is PRBTest {
 
     function setUp() public {
         implementationV1 = new PFPDAO(); // 初始化实现合约
-        
+
         // 部署代理合约并将其指向实现合约，这个是ERC1967Proxy
         proxy = new UUPSProxy(address(implementationV1), "");
 
@@ -30,6 +30,56 @@ contract _PFPDAOTest is PRBTest {
 
     function testCanInitialize() public {
         assertEq(wrappedProxyV1.symbol(), "PFP"); // 测试初始化是否成功
+    }
+
+    function testGetSlotProps() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 1, 0);
+        console.log("newSlot: %s", tempSlot);
+        assertEq(wrappedProxyV1.getRoleId(tempSlot), 1);
+        assertEq(wrappedProxyV1.getRarity(tempSlot), 0);
+        assertEq(wrappedProxyV1.getVariant(tempSlot), 1023);
+        assertEq(wrappedProxyV1.getLevel(tempSlot), 1);
+        assertEq(wrappedProxyV1.getExp(tempSlot), 0);
+    }
+
+    function testAddExp1() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 1, 0); // level 1, exp 0
+        (uint256 newSlot, uint32 overflowExp) = wrappedProxyV1.addExp(tempSlot, 21); // add 21 exp
+        assertEq(wrappedProxyV1.getLevel(newSlot), 3); // should be level3
+        assertEq(wrappedProxyV1.getExp(newSlot), 0); // and exp0
+        assertEq(overflowExp, 0);
+    }
+
+    function testAddExp2() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 1, 0); // level 1, exp 0
+        (uint256 newSlot, uint32 overflowExp) = wrappedProxyV1.addExp(tempSlot, 15); // add 15 exp
+        assertEq(wrappedProxyV1.getLevel(newSlot), 2); // should be level2
+        assertEq(wrappedProxyV1.getExp(newSlot), 5); // and exp 5
+        assertEq(overflowExp, 0);
+    }
+
+    function testAddExp3() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 19, 0); // level 19, exp 0
+        (uint256 newSlot, uint32 overflowExp) = wrappedProxyV1.addExp(tempSlot, 57); // add 57 exp
+        assertEq(wrappedProxyV1.getLevel(newSlot), 19); // should be level 19
+        assertEq(wrappedProxyV1.getExp(newSlot), 56); // and exp 56
+        assertEq(overflowExp, 1); // and overflow
+    }
+
+    function testAddExp4() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 19, 0); // level 19, exp 0
+        (uint256 newSlot, uint32 overflowExp) = wrappedProxyV1.addExp(tempSlot, 56); // add 56 exp
+        assertEq(wrappedProxyV1.getLevel(newSlot), 19); // should be level 19
+        assertEq(wrappedProxyV1.getExp(newSlot), 56); // and exp 56
+        assertEq(overflowExp, 0);
+    }
+
+    function testAddExp5() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 19, 57); // level 19, exp 57
+        (uint256 newSlot, uint32 overflowExp) = wrappedProxyV1.addExp(tempSlot, 1); // add 1 exp
+        assertEq(wrappedProxyV1.getLevel(newSlot), 19); // should be level 19
+        assertEq(wrappedProxyV1.getExp(newSlot), 56); // and exp 56
+        assertEq(overflowExp, 2); // will have more overflow exp, but not save in slot
     }
 
     // function testCanUpgrade() public {
