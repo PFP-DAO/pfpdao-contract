@@ -4,3 +4,4 @@ forge-std/=lib/forge-std/src/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @prb/test/=lib/prb-test/src/
+@chainlink/=lib/chainlink/contracts/src/v0.8/

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import {PRBTest} from "@prb/test/PRBTest.sol";
-import "forge-std/console.sol";
+import "forge-std/console2.sol";
 
 import {PFPDAO} from "../src/PFPDAO.sol";
 // import {PFPDAOV2} from "../src/PFPDAOV2.sol";
@@ -25,7 +25,12 @@ contract _PFPDAOTest is PRBTest {
         // 将代理合约包装成ABI，以支持更容易的调用
         wrappedProxyV1 = PFPDAO(address(proxy));
 
-        wrappedProxyV1.initialize(); // 初始化合约
+        wrappedProxyV1.initialize(0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada); // 初始化合约
+
+        // wrappedProxyV1.initialize(0xAB594600376Ec9fD91F8e885dADF0CE036862dE0); // mainnet
+
+        // vm mock user1 100 eth
+        vm.deal(user1, 100 ether);
     }
 
     function testCanInitialize() public {
@@ -34,7 +39,7 @@ contract _PFPDAOTest is PRBTest {
 
     function testGetSlotProps() public {
         uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1023, 1, 0);
-        console.log("newSlot: %s", tempSlot);
+        console2.log("newSlot: %s", tempSlot);
         assertEq(wrappedProxyV1.getRoleId(tempSlot), 1);
         assertEq(wrappedProxyV1.getRarity(tempSlot), 0);
         assertEq(wrappedProxyV1.getVariant(tempSlot), 1023);
@@ -80,6 +85,15 @@ contract _PFPDAOTest is PRBTest {
         assertEq(wrappedProxyV1.getLevel(newSlot), 19); // should be level 19
         assertEq(wrappedProxyV1.getExp(newSlot), 56); // and exp 56
         assertEq(overflowExp, 2); // will have more overflow exp, but not save in slot
+    }
+
+    function testMint() public {
+        uint256 tempSlot = wrappedProxyV1.generateSlot(1, 0, 1, 1, 0);
+        vm.prank(user1);
+        wrappedProxyV1.mint{value: 3 ether}(tempSlot); // should pay 2.911 matic
+        vm.prank(user1);
+        vm.expectRevert();
+        wrappedProxyV1.mint{value: 2.9 ether}(tempSlot);
     }
 
     // function testCanUpgrade() public {

@@ -8,11 +8,17 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "erc-3525/ERC3525Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import "forge-std/console.sol";
+import "@chainlink/interfaces/AggregatorV3Interface.sol";
+
+import "forge-std/console2.sol";
 
 contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC3525Upgradeable, UUPSUpgradeable {
     uint32[89] public expTable;
     uint8[] public levelNeedAwakening;
+    int256 public priceLootOne;
+    int256 public priceLootTen;
+
+    AggregatorV3Interface internal priceFeed;
 
     function __ERC3525BaseMock_init(string memory name_, string memory symbol_, uint8 decimals_)
         internal
@@ -27,7 +33,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
         _disableInitializers();
     }
 
-    function initialize() public initializer {
+    function initialize(address oracle_) public initializer {
         __ERC3525BaseMock_init("PFPDAO", "PFP", 0);
         __Ownable_init();
         __UUPSUpgradeable_init();
@@ -123,9 +129,23 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             43909
         ];
         levelNeedAwakening = [20, 40, 60, 80, 90];
+        // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=polygon
+        priceFeed = AggregatorV3Interface(oracle_);
+
+        priceLootOne = 2.8e8; // 2.8 U
+        priceLootTen = 22e8; // 22 U
     }
 
-    function mint(uint256 slot_) public virtual {
+    function getLatestPrice() public view returns (int256) {
+        (, int256 price,,,) = priceFeed.latestRoundData(); // price 96180000 == 0.9618 U
+        return price;
+    }
+
+    function mint(uint256 slot_) public payable {
+        // int256 lastPrice = getLatestPrice();
+        int256 lastPrice = 96180000; // 0.9618 U for mock
+        uint256 shouldPay = uint256(priceLootOne * 1e18 / lastPrice);
+        require(msg.value > shouldPay, "Not enough MATIC");
         uint256 tokenId = _createOriginalTokenId();
         ERC3525Upgradeable._mint(_msgSender(), tokenId, slot_, 1);
     }
