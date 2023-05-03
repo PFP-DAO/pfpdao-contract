@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "erc-3525/ERC3525Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import "erc-3525/ERC3525Upgradeable.sol";
 
 import "@chainlink/interfaces/AggregatorV3Interface.sol";
 
@@ -15,28 +16,23 @@ import "forge-std/console2.sol";
 contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC3525Upgradeable, UUPSUpgradeable {
     uint32[89] public expTable;
     uint8[] public levelNeedAwakening;
-    int256 public priceLootOne;
-    int256 public priceLootTen;
 
-    AggregatorV3Interface internal priceFeed;
+    // approved pools
+    mapping(address => bool) public activePools;
 
-    function __ERC3525BaseMock_init(string memory name_, string memory symbol_, uint8 decimals_)
-        internal
-        onlyInitializing
-    {
-        __ERC3525_init_unchained(name_, symbol_, decimals_);
+    modifier onlyActivePool() {
+        require(activePools[msg.sender], "only active pool can mint");
+        _;
     }
 
-    function __ERC3525BaseMock_init_unchained(string memory, string memory, uint8) internal onlyInitializing {}
-
-    constructor() {
-        _disableInitializers();
-    }
-
-    function initialize(address oracle_) public initializer {
-        __ERC3525BaseMock_init("PFPDAO", "PFP", 0);
+    function __PFPDAO_init(string memory name_, string memory symbol_) internal onlyInitializing {
+        __ERC3525_init(name_, symbol_, 0);
         __Ownable_init();
         __UUPSUpgradeable_init();
+        __PFPDAO_init_unchained();
+    }
+
+    function __PFPDAO_init_unchained() internal onlyInitializing {
         expTable = [
             10,
             11,
@@ -129,25 +125,6 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             43909
         ];
         levelNeedAwakening = [20, 40, 60, 80, 90];
-        // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=polygon
-        priceFeed = AggregatorV3Interface(oracle_);
-
-        priceLootOne = 2.8e8; // 2.8 U
-        priceLootTen = 22e8; // 22 U
-    }
-
-    function getLatestPrice() public view returns (int256) {
-        (, int256 price,,,) = priceFeed.latestRoundData(); // price 96180000 == 0.9618 U
-        return price;
-    }
-
-    function mint(uint256 slot_) public payable {
-        // int256 lastPrice = getLatestPrice();
-        int256 lastPrice = 96180000; // 0.9618 U for mock
-        uint256 shouldPay = uint256(priceLootOne * 1e18 / lastPrice);
-        require(msg.value > shouldPay, "Not enough MATIC");
-        uint256 tokenId = _createOriginalTokenId();
-        ERC3525Upgradeable._mint(_msgSender(), tokenId, slot_, 1);
     }
 
     function generateSlot(uint16 roleId_, uint8 rarity_, uint32 variant_, uint8 level_, uint32 exp_)
@@ -155,34 +132,34 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
         pure
         returns (uint256)
     {
-        uint256 slot = uint256(roleId_) << 80;
-        slot |= uint256(rarity_) << 72;
-        slot |= uint256(variant_) << 40;
-        slot |= uint256(level_) << 32;
-        slot |= uint256(exp_);
+        uint256 slot = uint256(roleId_) << 88;
+        slot |= uint256(rarity_) << 80;
+        slot |= uint256(variant_) << 48;
+        slot |= uint256(level_) << 40;
+        slot |= uint256(exp_) << 8;
         return slot;
     }
 
     function getRoleId(uint256 slot_) public pure returns (uint16) {
-        return uint16((slot_ >> 80) & 0xFFFF);
+        return uint16((slot_ >> 88) & 0xFFFF);
     }
 
     function getRarity(uint256 slot_) public pure returns (uint8) {
-        return uint8((slot_ >> 72) & 0xFF);
+        return uint8((slot_ >> 80) & 0xFF);
     }
 
     function getVariant(uint256 slot_) public pure returns (uint32) {
-        uint32 variant = uint32((slot_ >> 40) & 0xFFFFFFFF);
+        uint32 variant = uint32((slot_ >> 48) & 0xFFFFFFFF);
         return variant;
     }
 
     function getLevel(uint256 slot_) public pure returns (uint8) {
-        uint8 level = uint8((slot_ >> 32) & 0xFF);
+        uint8 level = uint8((slot_ >> 40) & 0xFF);
         return level;
     }
 
     function getExp(uint256 slot_) public pure returns (uint32) {
-        return uint32(slot_ & 0xFFFFFFFF);
+        return uint32(slot_ >> 8 & 0xFFFFFFFF);
     }
 
     /**
@@ -224,6 +201,14 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     function getImplementation() external view returns (address) {
         return _getImplementation();
+    }
+
+    function addActivePool(address pool_) external onlyOwner {
+        activePools[pool_] = true;
+    }
+
+    function removeActivePool(address pool_) external onlyOwner {
+        activePools[pool_] = false;
     }
 
     /**
