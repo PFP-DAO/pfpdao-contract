@@ -13,6 +13,8 @@ import "@chainlink/interfaces/AggregatorV3Interface.sol";
 
 import "forge-std/console2.sol";
 
+error IsNotOwner();
+
 contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC3525Upgradeable, UUPSUpgradeable {
     uint32[89] public expTable;
     uint8[] public levelNeedAwakening;
@@ -196,19 +198,24 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
         return (generateSlot(getRoleId(slot_), getRarity(slot_), getVariant(slot_), newLevel, newExp), 0);
     }
 
-    /* admin functions */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    function getImplementation() external view returns (address) {
-        return _getImplementation();
+    function isActivePool(address pool_) external view returns (bool) {
+        return activePools[pool_];
     }
 
+    /* admin functions */
     function addActivePool(address pool_) external onlyOwner {
         activePools[pool_] = true;
     }
 
     function removeActivePool(address pool_) external onlyOwner {
         activePools[pool_] = false;
+    }
+
+    /* upgrade functions */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function getImplementation() external view returns (address) {
+        return _getImplementation();
     }
 
     /**

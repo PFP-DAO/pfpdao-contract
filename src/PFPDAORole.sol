@@ -9,19 +9,21 @@ contract PFPDAORole is PFPDAO {
         _disableInitializers();
     }
 
-    function initialize(string calldata name_, string calldata symbol_, address[] calldata addToPools_)
-        public
-        initializer
-    {
+    function initialize(string calldata name_, string calldata symbol_) public initializer {
         __PFPDAO_init(name_, symbol_);
-        for (uint256 i = 0; i < addToPools_.length; i++) {
-            activePools[addToPools_[i]] = true;
-        }
     }
 
     function mint(address to_, uint256 slot_, uint256 balance_) public {
         // only active pool can mint
         require(activePools[msg.sender], "only active pool can mint");
         _mint(to_, slot_, balance_);
+    }
+
+    function levelUp(uint256 nftId_, uint32 addExp_) public returns (uint256) {
+        uint256 oldSlot = slotOf(nftId_);
+        (uint256 newSlot,) = addExp(oldSlot, addExp_);
+        _burn(nftId_);
+        _mint(msg.sender, nftId_, newSlot, 1);
+        return newSlot;
     }
 }
