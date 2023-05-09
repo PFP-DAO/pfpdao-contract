@@ -5,6 +5,8 @@ pragma solidity ^0.8.0;
 import "./PFPDAO.sol";
 
 contract PFPDAORole is PFPDAO {
+    event LevelResult(uint256 indexed nftId, uint8 newLevel, uint32 newExp);
+
     constructor() {
         _disableInitializers();
     }
@@ -24,6 +26,8 @@ contract PFPDAORole is PFPDAO {
         (uint256 newSlot,) = addExp(oldSlot, addExp_);
         _burn(nftId_);
         _mint(msg.sender, nftId_, newSlot, 1);
+
+        emit LevelResult(nftId_, getLevel(newSlot), getExp(newSlot));
         return newSlot;
     }
 }

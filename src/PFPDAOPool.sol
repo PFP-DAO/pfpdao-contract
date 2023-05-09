@@ -28,9 +28,9 @@ contract PFPDAOPool is
     int256 public priceLootOne;
     int256 public priceLootTen;
 
+    mapping(address => uint8) public mintTimesForUpSS;
     mapping(address => uint8) public mintTimesForSSS;
     mapping(address => bool) public nextIsUpSSS;
-    mapping(address => uint8) public mintTimesForUpSS;
 
     AggregatorV3Interface internal priceFeed;
 
@@ -48,6 +48,12 @@ contract PFPDAOPool is
     // 50%的资金进入角色关联的池子
     mapping(uint16 => uint256) public roleIdPoolBalance;
     uint16 defaultRoleIdForNewUser;
+
+    event LootResult(address indexed user, uint256 slot, uint8 balance);
+
+    event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
+
+    // event SupportResult(address indexed user, uint16 indexed captainId, uint256 value);
 
     function __PFPDAOPool_init() internal onlyInitializing {
         __Ownable_init();
@@ -106,6 +112,11 @@ contract PFPDAOPool is
         } else {
             roleNFT.mint(_msgSender(), tmpSlot, 1);
         }
+
+        emit LootResult(_msgSender(), tmpSlot, 1);
+        emit GuarResult(
+            _msgSender(), mintTimesForUpSS[_msgSender()], mintTimesForSSS[_msgSender()], nextIsUpSSS[_msgSender()]
+            );
     }
 
     function loot1() external payable loot1PayVerify {
@@ -138,14 +149,21 @@ contract PFPDAOPool is
 
         for (uint8 i = 0; i < balance.length; i++) {
             if (balance[i] == 0) continue;
+            uint256 tmpSlot = slots[i];
+            uint8 tmpBalance = balance[i];
             if (roleNFT.getRarity(slots[i]) == 0) {
-                console2.log("slot: %s, balance: %s", slots[i], balance[i]);
-                uint256 tokenId = equipmentNFT.mint(_msgSender(), slots[i], balance[i]);
+                equipmentNFT.mint(_msgSender(), tmpSlot, tmpBalance);
+                // console2.log("equip slot: %s, balance: %s", tmpSlot, tmpBalance);
             } else {
-                roleNFT.mint(_msgSender(), slots[i], balance[i]);
-                console2.log("slot: %s, balance: %s", slots[i], balance[i]);
+                roleNFT.mint(_msgSender(), tmpSlot, tmpBalance);
+                // console2.log("role slot: %s, balance: %s", tmpSlot, tmpBalance);
             }
+            emit LootResult(_msgSender(), tmpSlot, tmpBalance);
         }
+
+        emit GuarResult(
+            _msgSender(), mintTimesForUpSS[_msgSender()], mintTimesForSSS[_msgSender()], nextIsUpSSS[_msgSender()]
+            );
     }
 
     function loot10() external payable loot10PayVerify {
@@ -198,7 +216,7 @@ contract PFPDAOPool is
         } else {
             // 1% Legendary, 10% Rare, 89% Common
             uint8 randomValue = uint8(seed % 100);
-            console2.log("randomValue", randomValue);
+            // console2.log("randomValue", randomValue);
             if (randomValue < 1) {
                 if (normalLegendaryIds.length == 0) {
                     roleId = upLegendaryId;
