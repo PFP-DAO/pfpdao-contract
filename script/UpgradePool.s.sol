@@ -8,21 +8,22 @@ import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool} from "../src/PFPDAOPool.sol";
 import {PFPDAORole} from "../src/PFPDAORole.sol";
 
-contract SetUpPool is Script {
+contract UpgradePool is Script {
     function run() public {
         address pool = vm.envAddress("POOL_ADDRESS");
-        address equip = vm.envAddress("EQUIP_ADDRESS");
-        address roleA = vm.envAddress("ROLEA_ADDRESS");
 
         // 将代理合约包装成ABI，以支持更容易的调用
         PFPDAOPool wrappedPoolV1 = PFPDAOPool(pool);
-        PFPDAOEquipment wrappedEquipV1 = PFPDAOEquipment(equip);
-        PFPDAORole wrappedRoleAV1 = PFPDAORole(roleA);
-        // PFPDAORole wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
 
         uint256 privKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.rememberKey(privKey);
         vm.startBroadcast(deployer);
+
+        PFPDAOPool implementationV2 = new PFPDAOPool();
+
+        wrappedPoolV1.upgradeTo(address(implementationV2));
+
+        PFPDAOPool wrappedPoolV2 = PFPDAOPool(pool);
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
         uint16 upLegendaryId = 1;
@@ -34,9 +35,7 @@ contract SetUpPool is Script {
         uint16[] memory normalRareIds = new uint16[](0);
         uint16[] memory normalCommonIds = new uint16[](1);
         normalCommonIds[0] = 0;
-        wrappedPoolV1.setPoolRoleIds(upLegendaryId, upRareIds, normalLegendaryIds, normalRareIds, normalCommonIds);
-        wrappedEquipV1.addActivePool(pool);
-        wrappedRoleAV1.addActivePool(pool);
+        wrappedPoolV2.setPoolRoleIds(upLegendaryId, upRareIds, normalLegendaryIds, normalRareIds, normalCommonIds);
 
         vm.stopBroadcast();
     }

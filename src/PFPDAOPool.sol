@@ -109,8 +109,10 @@ contract PFPDAOPool is
 
         if (equipmentNFT.getRarity(tmpSlot) == 0) {
             equipmentNFT.mint(_msgSender(), tmpSlot, 1);
+            // console2.log("[loot1] equipment slot: %s, balance: %s", tmpSlot, 1);
         } else {
             roleNFT.mint(_msgSender(), tmpSlot, 1);
+            // console2.log("[loot1] role slot: %s, balance: %s", tmpSlot, 1);
         }
 
         emit LootResult(_msgSender(), tmpSlot, 1);
@@ -136,14 +138,17 @@ contract PFPDAOPool is
 
         for (uint8 i = 0; i < 10; i++) {
             uint256 tmpSlot = _mintLogic(i);
+            bool found = false;
             for (uint8 j = 0; j < slots.length; j++) {
                 if (slots[j] == tmpSlot) {
                     balance[j]++;
-                } else {
-                    slots[i] = tmpSlot;
-                    balance[i] = 1;
+                    found = true;
+                    break;
                 }
-                break;
+            }
+            if (!found) {
+                slots[i] = tmpSlot;
+                balance[i] = 1;
             }
         }
 
@@ -153,10 +158,10 @@ contract PFPDAOPool is
             uint8 tmpBalance = balance[i];
             if (roleNFT.getRarity(slots[i]) == 0) {
                 equipmentNFT.mint(_msgSender(), tmpSlot, tmpBalance);
-                // console2.log("equip slot: %s, balance: %s", tmpSlot, tmpBalance);
+                // console2.log("[loot10] equipment slot: %s, balance: %s", tmpSlot, tmpBalance);
             } else {
                 roleNFT.mint(_msgSender(), tmpSlot, tmpBalance);
-                // console2.log("role slot: %s, balance: %s", tmpSlot, tmpBalance);
+                // console2.log("[loot10] role slot: %s, balance: %s", tmpSlot, tmpBalance);
             }
             emit LootResult(_msgSender(), tmpSlot, tmpBalance);
         }
@@ -178,7 +183,7 @@ contract PFPDAOPool is
     }
 
     function _mintLogic(uint8 _time) private returns (uint256) {
-        uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, block.difficulty, _time)));
+        uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, _time)));
         uint16 roleId;
         uint8 rarity;
 
@@ -193,7 +198,7 @@ contract PFPDAOPool is
             rarity = 2;
             nextIsUpSSS[_msgSender()] = false;
             mintTimesForSSS[_msgSender()] = 0;
-        } else if (mintTimesForSSS[_msgSender()] == 90) {
+        } else if (mintTimesForSSS[_msgSender()] == 89) {
             // 角色保底：每90次抽卡必定获得一个Legendary传说级角色
             if (normalLegendaryIds.length == 0) {
                 roleId = upLegendaryId;
@@ -204,7 +209,7 @@ contract PFPDAOPool is
             }
             rarity = 2;
             mintTimesForSSS[_msgSender()] = 0;
-        } else if (mintTimesForUpSS[_msgSender()] == 10) {
+        } else if (mintTimesForUpSS[_msgSender()] == 9) {
             if (normalRareIds.length == 0) {
                 roleId = upRareIds[seed % upRareIds.length];
             } else if (seed % 4 == 0) {
@@ -213,10 +218,10 @@ contract PFPDAOPool is
                 roleId = normalRareIds[seed % normalRareIds.length];
             }
             rarity = 1;
+            mintTimesForUpSS[_msgSender()] = 0;
         } else {
             // 1% Legendary, 10% Rare, 89% Common
             uint8 randomValue = uint8(seed % 100);
-            // console2.log("randomValue", randomValue);
             if (randomValue < 1) {
                 if (normalLegendaryIds.length == 0) {
                     roleId = upLegendaryId;

@@ -68,6 +68,9 @@ contract _PFPDAOPoolTest is PRBTest {
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);
+
+        // warp to 3 is bad lucky
+        vm.warp(3);
     }
 
     function testLoot1_newUser() public {
@@ -97,7 +100,8 @@ contract _PFPDAOPoolTest is PRBTest {
         assertEq(exp, 2);
     }
 
-    function testLoot10_oldUser() public {
+    function testLoot10_oldUser(uint256 timestamp) public {
+        vm.warp(timestamp);
         vm.startPrank(user1);
         wrappedPoolV1.loot10{value: 0.01 ether}();
         uint256 roleSlot = wrappedRoleAV1.slotOf(1);
@@ -162,7 +166,7 @@ contract _PFPDAOPoolTest is PRBTest {
     function testGuarResultEvent_2() public {
         vm.startPrank(user1);
         vm.expectEmit(true, false, false, true);
-        emit GuarResult(user1, 5, 10, false);
+        emit GuarResult(user1, 7, 10, false);
         wrappedPoolV1.loot10{value: 0.01 ether}();
     }
 }
