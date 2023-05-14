@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -87,14 +86,14 @@ contract PFPDAOPool is
     modifier loot1PayVerify() {
         int256 lastPrice = getLatestPrice();
         uint256 shouldPay = uint256(priceLootOne * 1e18 / lastPrice);
-        require(msg.value > shouldPay, "Not enough MATIC");
+        require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
 
     modifier loot10PayVerify() {
         int256 lastPrice = getLatestPrice();
         uint256 shouldPay = uint256(priceLootTen * 1e18 / lastPrice);
-        require(msg.value > shouldPay, "Not enough MATIC");
+        require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
 
@@ -132,9 +131,9 @@ contract PFPDAOPool is
         roleNFT.levelUp(nftId_, 2);
     }
 
-    function _loot10() private {
-        uint256[] memory slots = new uint256[](10);
-        uint8[] memory balance = new uint8[](10);
+    function _lootN(uint8 time_) private {
+        uint256[] memory slots = new uint256[](time_);
+        uint8[] memory balance = new uint8[](time_);
 
         for (uint8 i = 0; i < 10; i++) {
             uint256 tmpSlot = _mintLogic(i);
@@ -173,17 +172,17 @@ contract PFPDAOPool is
 
     function loot10() external payable loot10PayVerify {
         roleIdPoolBalance[defaultRoleIdForNewUser] += msg.value / 2;
-        _loot10();
+        _lootN(10);
     }
 
     function loot10(uint16 captainId_, uint256 nftId_) external payable loot10PayVerify {
         roleIdPoolBalance[captainId_] += msg.value / 2;
-        _loot10();
+        _lootN(10);
         roleNFT.levelUp(nftId_, 20);
     }
 
-    function _mintLogic(uint8 _time) private returns (uint256) {
-        uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, _time)));
+    function _mintLogic(uint8 time_) private returns (uint256) {
+        uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, time_)));
         uint16 roleId;
         uint8 rarity;
 
