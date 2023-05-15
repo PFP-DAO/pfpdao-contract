@@ -169,4 +169,26 @@ contract _PFPDAOPoolTest is PRBTest {
         emit GuarResult(user1, 7, 10, false);
         wrappedPoolV1.loot10{value: 0.01 ether}();
     }
+
+    function testGetGuarResult() public {
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 0.01 ether}();
+        (uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS) = wrappedPoolV1.getGuarInfo(user1);
+        assertEq(newSSGuar, 7);
+        assertEq(newSSSGuar, 10);
+        assertEq(isUpSSS, false);
+    }
+
+    // function testURI() public {
+    //     vm.startPrank(user1);
+    //     wrappedPoolV1.loot10{value: 0.01 ether}();
+
+    // getBestRoleNFT tokenId and slot
+
+    // contractURI();
+    // tokenURI(uint256 tokenId_);
+    // slotURI(uint256 slot_);
+    // wrappedRoleAV1.setBaseURI("https://www.pfp.me/");
+    // assertEq(wrappedRoleAV1.tokenURI(1), "https://www.pfp.me/1");
+    // }
 }

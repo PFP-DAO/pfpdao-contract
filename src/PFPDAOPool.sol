@@ -181,6 +181,10 @@ contract PFPDAOPool is
         roleNFT.levelUp(nftId_, 20);
     }
 
+    function getGuarInfo(address user_) external view returns (uint8, uint8, bool) {
+        return (mintTimesForUpSS[user_], mintTimesForSSS[user_], nextIsUpSSS[user_]);
+    }
+
     function _mintLogic(uint8 time_) private returns (uint256) {
         uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, time_)));
         uint16 roleId;
