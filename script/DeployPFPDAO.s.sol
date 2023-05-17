@@ -9,7 +9,6 @@ import {PFPDAOPool} from "../src/PFPDAOPool.sol";
 import {PFPDAORole} from "../src/PFPDAORole.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
-import {UUPSProxy} from "../src/UUPSProxy.sol";
 // import {PFPDAOV2} from "../src/PFPDAOV2.sol";
 
 contract Deploy is Script {
