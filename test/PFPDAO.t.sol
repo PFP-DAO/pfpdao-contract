@@ -26,7 +26,8 @@ contract _PFPDAOTest is PRBTest {
     PFPDAORole wrappedRoleAV1;
     PFPDAORole wrappedRoleBV1;
 
-    address user1 = address(0x01);
+    address admin = address(0x01);
+    address user1 = address(0x02);
 
     function setUp() public {
         implementationPoolV1 = new PFPDAOPool();
@@ -43,14 +44,17 @@ contract _PFPDAOTest is PRBTest {
         // 将代理合约包装成ABI，以支持更容易的调用
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
+        console2.log("wrappedEquipV1 owner", wrappedEquipV1.owner());
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
         wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
 
         // 初始化合约
-        wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedEquipV1.initialize();
         wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
         wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
+        wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
+
+        wrappedEquipV1.addActivePool(address(proxyPool));
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);

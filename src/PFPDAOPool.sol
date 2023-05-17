@@ -54,21 +54,11 @@ contract PFPDAOPool is
 
     // event SupportResult(address indexed user, uint16 indexed captainId, uint256 value);
 
-    function __PFPDAOPool_init() internal onlyInitializing {
-        __Ownable_init();
-        __UUPSUpgradeable_init();
-    }
+    // function __PFPDAOPool_init() internal onlyInitializing {
+    //     __PFPDAOPool_init_unchained();
+    // }
 
-    function __PFPDAO_init_unchained() internal onlyInitializing {
-        // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=polygon
-        // mainnet 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
-        priceFeed = AggregatorV3Interface(0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada);
-
-        priceLootOne = 2.8e8; // 2.8 U
-        priceLootTen = 22e8; // 22 U
-
-        equipmentNFT.addActivePool(address(this));
-    }
+    // function __PFPDAOPool_init_unchained() internal onlyInitializing {}
 
     constructor() {
         _disableInitializers();
@@ -77,22 +67,29 @@ contract PFPDAOPool is
     function initialize(address equipmentAddress_, address roleNFTAddress_) public initializer {
         __Ownable_init();
         __UUPSUpgradeable_init();
-        __PFPDAOPool_init();
-        equipmentNFT = PFPDAOEquipment(equipmentAddress_);
         roleNFT = PFPDAORole(roleNFTAddress_);
+        equipmentNFT = PFPDAOEquipment(equipmentAddress_);
+
         defaultRoleIdForNewUser = 1;
+
+        // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=polygon
+        // mainnet 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
+        priceFeed = AggregatorV3Interface(0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada);
+
+        priceLootOne = 2.8e8; // 2.8 U
+        priceLootTen = 22e8; // 22 U
     }
 
     modifier loot1PayVerify() {
         int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootOne * 1e18 / lastPrice);
+        uint256 shouldPay = uint256(priceLootOne * 1 / lastPrice); // change 1 -> 1e18
         require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
 
     modifier loot10PayVerify() {
         int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootTen * 1e18 / lastPrice);
+        uint256 shouldPay = uint256(priceLootTen * 1 / lastPrice); // change 1 -> 1e18
         require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
