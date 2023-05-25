@@ -27,6 +27,7 @@ contract _PFPDAOPoolTest is PRBTest {
     PFPDAORole wrappedRoleBV1;
 
     address user1 = address(0x01);
+    address user2 = address(0x02);
 
     function setUp() public {
         implementationPoolV1 = new PFPDAOPool();
@@ -75,7 +76,7 @@ contract _PFPDAOPoolTest is PRBTest {
 
     function testLoot1_newUser() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot1{value: 0.001 ether}();
+        wrappedPoolV1.loot1{value: 2.8 ether}();
         assertEq(wrappedEquipV1.balanceOf(user1) + wrappedRoleAV1.balanceOf(user1), 1);
         assertEq(wrappedEquipV1.balanceOf(1), 1);
         assertEq(wrappedEquipV1.balanceOf(user1), 1);
@@ -83,7 +84,7 @@ contract _PFPDAOPoolTest is PRBTest {
 
     function testLoot10_newUser() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         // will have 9 equip and 1 role
         assertEq(wrappedEquipV1.balanceOf(1), 9);
         assertEq(wrappedEquipV1.balanceOf(user1), 1);
@@ -93,9 +94,9 @@ contract _PFPDAOPoolTest is PRBTest {
 
     function testLoot1_oldUser() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         uint16 captainId = wrappedRoleAV1.getRoleId(wrappedRoleAV1.slotOf(1));
-        wrappedPoolV1.loot1{value: 0.001 ether}(captainId, 1); // first nftid will 1
+        wrappedPoolV1.loot1{value: 2.8 ether}(captainId, 1); // first nftid will 1
         uint32 exp = wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(1));
         assertEq(exp, 2);
     }
@@ -103,7 +104,7 @@ contract _PFPDAOPoolTest is PRBTest {
     function testLoot10_oldUser(uint256 timestamp) public {
         vm.warp(timestamp);
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         uint256 roleSlot = wrappedRoleAV1.slotOf(1);
         uint16 captainId = wrappedRoleAV1.getRoleId(roleSlot);
         (uint256 newSlot,) = wrappedRoleAV1.addExp(roleSlot, 20);
@@ -111,7 +112,7 @@ contract _PFPDAOPoolTest is PRBTest {
         uint8 levelExpect = wrappedRoleAV1.getLevel(newSlot);
         assertEq(expExpect, 10);
         assertEq(levelExpect, 2);
-        wrappedPoolV1.loot10{value: 0.01 ether}(captainId, 1); // first nftid will 1
+        wrappedPoolV1.loot10{value: 22 ether}(captainId, 1); // first nftid will 1
         uint256 roleSlotAfterlevelUp = wrappedRoleAV1.slotOf(1);
         uint32 expActual = wrappedRoleAV1.getExp(roleSlotAfterlevelUp);
         uint8 levelActual = wrappedRoleAV1.getLevel(roleSlotAfterlevelUp);
@@ -123,35 +124,35 @@ contract _PFPDAOPoolTest is PRBTest {
 
     function testLootResultEvent_1() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         uint16 captainId = wrappedRoleAV1.getRoleId(wrappedRoleAV1.slotOf(1));
 
         vm.expectEmit(true, false, false, true);
         emit LootResult(user1, 1099511627776, 1);
-        wrappedPoolV1.loot1{value: 0.001 ether}(captainId, 1);
+        wrappedPoolV1.loot1{value: 2.8 ether}(captainId, 1);
     }
 
     function testLootResultEvent_2() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         uint16 captainId = wrappedRoleAV1.getRoleId(wrappedRoleAV1.slotOf(1));
 
         vm.expectEmit(true, false, false, true);
         emit LootResult(user1, 1099511627776, 9);
         emit LootResult(user1, 929663955283932409837387776, 1);
-        wrappedPoolV1.loot10{value: 0.001 ether}(captainId, 1);
+        wrappedPoolV1.loot10{value: 2.8 ether}(captainId, 1);
     }
 
     event LevelResult(uint256 indexed nftId, uint8 newLevel, uint32 newExp);
 
     function testLevelResultEvent() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         uint16 captainId = wrappedRoleAV1.getRoleId(wrappedRoleAV1.slotOf(1));
 
         vm.expectEmit(true, false, false, true);
         emit LevelResult(1, 2, 10);
-        wrappedPoolV1.loot10{value: 0.01 ether}(captainId, 1);
+        wrappedPoolV1.loot10{value: 22 ether}(captainId, 1);
     }
 
     event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
@@ -160,19 +161,19 @@ contract _PFPDAOPoolTest is PRBTest {
         vm.startPrank(user1);
         vm.expectEmit(true, false, false, true);
         emit GuarResult(user1, 1, 1, false);
-        wrappedPoolV1.loot1{value: 0.001 ether}();
+        wrappedPoolV1.loot1{value: 2.8 ether}();
     }
 
     function testGuarResultEvent_2() public {
         vm.startPrank(user1);
         vm.expectEmit(true, false, false, true);
         emit GuarResult(user1, 7, 10, false);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
     }
 
     function testGetGuarResult() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 0.01 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
         (uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS) = wrappedPoolV1.getGuarInfo(user1);
         assertEq(newSSGuar, 7);
         assertEq(newSSSGuar, 10);
@@ -181,7 +182,7 @@ contract _PFPDAOPoolTest is PRBTest {
 
     // function testURI() public {
     //     vm.startPrank(user1);
-    //     wrappedPoolV1.loot10{value: 0.01 ether}();
+    //     wrappedPoolV1.loot10{value: 22 ether}();
 
     // getBestRoleNFT tokenId and slot
 

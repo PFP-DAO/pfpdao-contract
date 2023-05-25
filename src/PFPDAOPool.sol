@@ -11,9 +11,9 @@ import {PFPDAORoleVariantManager} from "./PFPDAORoleVariantManager.sol";
 import {PFPDAOEquipment} from "./PFPDAOEquipment.sol";
 import {PFPDAORole} from "./PFPDAORole.sol";
 
-import "@chainlink/interfaces/AggregatorV3Interface.sol";
+// import "@chainlink/interfaces/AggregatorV3Interface.sol";
 
-import "forge-std/console2.sol";
+// import "forge-std/console2.sol";
 
 error PoolNotSet();
 
@@ -31,7 +31,7 @@ contract PFPDAOPool is
     mapping(address => uint8) public mintTimesForSSS;
     mapping(address => bool) public nextIsUpSSS;
 
-    AggregatorV3Interface internal priceFeed;
+    // AggregatorV3Interface internal _priceFeed;
 
     // 部署池子的时候，应该指定装备地址和角色NFT地址
     PFPDAOEquipment public equipmentNFT;
@@ -46,7 +46,7 @@ contract PFPDAOPool is
 
     // 50%的资金进入角色关联的池子
     mapping(uint16 => uint256) public roleIdPoolBalance;
-    uint16 defaultRoleIdForNewUser;
+    uint16 _defaultRoleIdForNewUser;
 
     event LootResult(address indexed user, uint256 slot, uint8 balance);
 
@@ -70,34 +70,35 @@ contract PFPDAOPool is
         roleNFT = PFPDAORole(roleNFTAddress_);
         equipmentNFT = PFPDAOEquipment(equipmentAddress_);
 
-        defaultRoleIdForNewUser = 1;
+        _defaultRoleIdForNewUser = 1;
 
         // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=polygon
         // mainnet 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
-        priceFeed = AggregatorV3Interface(0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada);
-
-        priceLootOne = 2.8e8; // 2.8 U
-        priceLootTen = 22e8; // 22 U
+        // _priceFeed = AggregatorV3Interface(0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada);
+        // priceLootOne = 2.8e8; // 2.8 U
+        // priceLootTen = 22e8; // 22 U
+        priceLootOne = 2.8e18;
+        priceLootTen = 22e18;
     }
 
     modifier loot1PayVerify() {
         int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootOne * 1 / lastPrice); // change 1 -> 1e18
+        uint256 shouldPay = uint256(priceLootOne / lastPrice); // change 1 -> 1e18
         require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
 
     modifier loot10PayVerify() {
         int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootTen * 1 / lastPrice); // change 1 -> 1e18
+        uint256 shouldPay = uint256(priceLootTen / lastPrice); // change 1 -> 1e18
         require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
 
-    function getLatestPrice() public view returns (int256) {
-        // (, int256 price,,,) = priceFeed.latestRoundData();
+    function getLatestPrice() public pure returns (int256) {
+        // (, int256 price,,,) = _priceFeed.latestRoundData();
         // return price;
-        return 96180000; // price 96180000 == 0.9618 U for mock
+        return 10000000; // price 100000000 == 1 U for mock
     }
 
     function _loot1() private {
@@ -118,7 +119,7 @@ contract PFPDAOPool is
     }
 
     function loot1() external payable loot1PayVerify {
-        roleIdPoolBalance[defaultRoleIdForNewUser] += msg.value / 2;
+        roleIdPoolBalance[_defaultRoleIdForNewUser] += msg.value / 2;
         _loot1();
     }
 
@@ -168,7 +169,7 @@ contract PFPDAOPool is
     }
 
     function loot10() external payable loot10PayVerify {
-        roleIdPoolBalance[defaultRoleIdForNewUser] += msg.value / 2;
+        roleIdPoolBalance[_defaultRoleIdForNewUser] += msg.value / 2;
         _lootN(10);
     }
 
@@ -198,6 +199,7 @@ contract PFPDAOPool is
             rarity = 2;
             nextIsUpSSS[_msgSender()] = false;
             mintTimesForSSS[_msgSender()] = 0;
+            mintTimesForUpSS[_msgSender()] += 1;
         } else if (mintTimesForSSS[_msgSender()] == 89) {
             // 角色保底：每90次抽卡必定获得一个Legendary传说级角色
             if (normalLegendaryIds.length == 0) {
@@ -209,6 +211,7 @@ contract PFPDAOPool is
             }
             rarity = 2;
             mintTimesForSSS[_msgSender()] = 0;
+            mintTimesForUpSS[_msgSender()] += 1;
         } else if (mintTimesForUpSS[_msgSender()] == 9) {
             if (normalRareIds.length == 0) {
                 roleId = upRareIds[seed % upRareIds.length];
@@ -219,6 +222,7 @@ contract PFPDAOPool is
             }
             rarity = 1;
             mintTimesForUpSS[_msgSender()] = 0;
+            mintTimesForSSS[_msgSender()] += 1;
         } else {
             // 1% Legendary, 10% Rare, 89% Common
             uint8 randomValue = uint8(seed % 100);
@@ -276,7 +280,7 @@ contract PFPDAOPool is
     }
 
     function setDefaultRoleIdForNewUser(uint16 roleId_) external onlyOwner {
-        defaultRoleIdForNewUser = roleId_;
+        _defaultRoleIdForNewUser = roleId_;
     }
 
     /* upgradeable functions */
