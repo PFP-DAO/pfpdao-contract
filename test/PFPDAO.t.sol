@@ -6,7 +6,7 @@ import "forge-std/console2.sol";
 
 import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool} from "../src/PFPDAOPool.sol";
-import {PFPDAORole} from "../src/PFPDAORole.sol";
+import {PFPDAORole, Soulbound, InvalidSlot} from "../src/PFPDAORole.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 
@@ -26,10 +26,16 @@ contract _PFPDAOTest is PRBTest {
     PFPDAORole wrappedRoleAV1;
     PFPDAORole wrappedRoleBV1;
 
+    address signer;
+    uint256 signerPrivateKey = 0xabcdf1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
     address admin = address(0x01);
     address user1 = address(0x02);
+    address treasury = address(0x03);
+    address user2 = address(0x04);
 
     function setUp() public {
+        signer = vm.addr(signerPrivateKey);
+
         implementationPoolV1 = new PFPDAOPool();
         implementationEquipV1 = new PFPDAOEquipment();
         implementationRoleAV1 = new PFPDAORole();
@@ -44,27 +50,62 @@ contract _PFPDAOTest is PRBTest {
         // 将代理合约包装成ABI，以支持更容易的调用
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
-        console2.log("wrappedEquipV1 owner", wrappedEquipV1.owner());
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
         wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
 
         // 初始化合约
+        wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedEquipV1.initialize();
         wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
         wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
-        wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
+
+        // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
+        uint16 upLegendaryId = 1;
+        uint16[] memory upRareIds = new uint16[](3);
+        upRareIds[0] = 2;
+        upRareIds[1] = 3;
+        upRareIds[2] = 4;
+        uint16[] memory normalLegendaryIds = new uint16[](0);
+        uint16[] memory normalRareIds = new uint16[](0);
+        uint16[] memory normalCommonIds = new uint16[](1);
+        normalCommonIds[0] = 0;
+        wrappedPoolV1.setUpLegendaryId(upLegendaryId);
+        wrappedPoolV1.setUpRareIds(upRareIds);
+        wrappedPoolV1.setNormalLegendaryIds(normalLegendaryIds);
+        wrappedPoolV1.setNormalRareIds(normalRareIds);
+        wrappedPoolV1.setNormalCommonIds(normalCommonIds);
 
         wrappedEquipV1.addActivePool(address(proxyPool));
+        wrappedRoleAV1.addActivePool(address(proxyPool));
+
+        wrappedRoleAV1.setRoleName(1, "Linger");
+        wrappedRoleAV1.setRoleName(2, "Kazuki");
+        wrappedRoleAV1.setRoleName(3, "Mila");
+        wrappedRoleAV1.setRoleName(4, "Mico");
+
+        wrappedPoolV1.setTreasury(treasury);
+        wrappedPoolV1.setSigner(signer);
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);
+
+        // warp to 3 is bad lucky
+        vm.warp(3);
     }
 
     function testCanInitialize() public {
         // 测试初始化是否成功
         assertEq(wrappedEquipV1.symbol(), "PFPE");
         assertEq(wrappedRoleAV1.symbol(), "PFPRA");
+        assertEq(wrappedRoleAV1.name(), "PFPDAORoleA");
         assertEq(wrappedRoleBV1.symbol(), "PFPRB");
+    }
+
+    function testRoleName() public {
+        assertEq(wrappedRoleAV1.roldIdToName(1), "Linger");
+        assertEq(wrappedRoleAV1.roldIdToName(2), "Kazuki");
+        assertEq(wrappedRoleAV1.roldIdToName(3), "Mila");
+        assertEq(wrappedRoleAV1.roldIdToName(4), "Mico");
     }
 
     // Test Role function
@@ -122,5 +163,69 @@ contract _PFPDAOTest is PRBTest {
         assertTrue(wrappedRoleAV1.isActivePool(address(wrappedPoolV1)));
         wrappedRoleAV1.removeActivePool(address(wrappedPoolV1));
         assertFalse(wrappedRoleAV1.isActivePool(address(wrappedPoolV1)));
+    }
+
+    function testSoulbound() public {
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        wrappedRoleAV1.safeTransferFrom(user1, address(this), 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        wrappedRoleAV1.transferFrom(user1, address(this), 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        wrappedEquipV1.safeTransferFrom(user1, address(this), 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        wrappedEquipV1.transferFrom(user1, address(this), 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        wrappedEquipV1.transferFrom(1, address(this), 9);
+    }
+
+    function testTokenURI() public {
+        vm.prank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        string memory roleUri = wrappedRoleAV1.tokenURI(1);
+        assertEq(roleUri, "https://pfpdao-0.4everland.store/metadata/4/V1_0/role_4_V1_0_1_Mico.json");
+
+        vm.deal(user2, 22 ether);
+        vm.prank(user2);
+        vm.warp(6);
+        wrappedPoolV1.loot10{value: 22 ether}();
+        string memory roleUri2 = wrappedRoleAV1.tokenURI(2); // This will be Mico
+        assertEq(roleUri2, "https://pfpdao-0.4everland.store/metadata/4/V1_0/role_4_V1_0_2_Mico.json");
+    }
+
+    function testAirdrop() public {
+        // Call the airdrop function with an array of addresses and a slot number
+        address[] memory recipients = new address[](2);
+        recipients[0] = address(0x123);
+        recipients[1] = address(0x456);
+        wrappedRoleAV1.airdrop(recipients, 1, 1, 1);
+
+        // Check that the recipients received the tokens
+        uint256 balance0 = wrappedRoleAV1.balanceOf(recipients[0]);
+        uint256 balance1 = wrappedRoleAV1.balanceOf(recipients[1]);
+        assertEq(balance0, 1);
+        assertEq(balance1, 1);
+
+        // Check that the slot number is correct
+        uint256 recipient1RoleSlot = wrappedRoleAV1.slotOf(1);
+        uint32 variant1 = wrappedRoleAV1.getVariant(recipient1RoleSlot);
+        assertEq(variant1, 1);
+        assertEq(wrappedRoleAV1.getRoleId(recipient1RoleSlot), 1);
+        uint256 recipient2RoleSlot = wrappedRoleAV1.slotOf(2);
+        uint32 variant2 = wrappedRoleAV1.getVariant(recipient2RoleSlot);
+        assertEq(variant2, 2);
+        assertEq(wrappedRoleAV1.getRoleId(recipient2RoleSlot), 1);
+        vm.expectRevert(InvalidSlot.selector);
+        wrappedRoleAV1.airdrop(recipients, 1, 1, 60);
+
+        vm.expectRevert(InvalidSlot.selector);
+        wrappedRoleAV1.airdrop(recipients, 5, 1, 1);
     }
 }

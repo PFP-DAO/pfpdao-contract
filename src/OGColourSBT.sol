@@ -28,7 +28,7 @@ contract OGColourSBT is
     function initialize() public initializer {
         __Ownable_init();
         __Pausable_init();
-        _setBaseURI("https://pfpdao-test-0.4everland.store/ogSBT/metadata/");
+        _setBaseURI("https://pfpdao-0.4everland.store/ogSBT/metadata/");
         _setURI(1, "1");
         _setURI(2, "2");
         _setURI(3, "3");

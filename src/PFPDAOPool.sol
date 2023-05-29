@@ -5,6 +5,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/SignatureCheckerUpgradeable.sol";
 
 import {PFPDAO} from "./PFPDAO.sol";
 import {PFPDAORoleVariantManager} from "./PFPDAORoleVariantManager.sol";
@@ -15,7 +17,10 @@ import {PFPDAORole} from "./PFPDAORole.sol";
 
 // import "forge-std/console2.sol";
 
-error PoolNotSet();
+// error FreeLooted(address);
+error InvalidSignature();
+error WhiteListUsed(uint8);
+error InvaildLootTimes();
 
 contract PFPDAOPool is
     Initializable,
@@ -24,6 +29,9 @@ contract PFPDAOPool is
     UUPSUpgradeable,
     PFPDAORoleVariantManager
 {
+    using ECDSAUpgradeable for bytes32;
+    using SignatureCheckerUpgradeable for address;
+
     int256 public priceLootOne;
     int256 public priceLootTen;
 
@@ -32,24 +40,31 @@ contract PFPDAOPool is
     mapping(address => bool) public nextIsUpSSS;
 
     // AggregatorV3Interface internal _priceFeed;
+    // address public oldAddressSlot;
 
-    // 部署池子的时候，应该指定装备地址和角色NFT地址
+    // When deploying the pool, the equipment address and the character NFT address should be specified.
     PFPDAOEquipment public equipmentNFT;
     PFPDAORole public roleNFT;
-    // PFPDAO public pfpdao;
 
     uint16 public upLegendaryId;
+    uint16[] public oldArraySlot;
     uint16[] public upRareIds;
     uint16[] public normalLegendaryIds;
     uint16[] public normalRareIds;
     uint16[] public normalCommonIds;
 
-    // 50%的资金进入角色关联的池子
+    // 50% of the funds go into the pool associated with the character.
     mapping(uint16 => uint256) public roleIdPoolBalance;
     uint16 _defaultRoleIdForNewUser;
 
-    event LootResult(address indexed user, uint256 slot, uint8 balance);
+    mapping(address => bool) public oldFreeLooted;
+    mapping(address => uint8) public isWhitelistLooted;
 
+    uint8 public activeNonce;
+    address public signer;
+    address public treasury;
+
+    event LootResult(address indexed user, uint256 slot, uint8 balance);
     event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
 
     // event SupportResult(address indexed user, uint16 indexed captainId, uint256 value);
@@ -83,14 +98,14 @@ contract PFPDAOPool is
 
     modifier loot1PayVerify() {
         int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootOne / lastPrice); // change 1 -> 1e18
+        uint256 shouldPay = uint256(priceLootOne / lastPrice);
         require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
 
     modifier loot10PayVerify() {
         int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootTen / lastPrice); // change 1 -> 1e18
+        uint256 shouldPay = uint256(priceLootTen / lastPrice);
         require(msg.value > shouldPay, "No enough MATIC");
         _;
     }
@@ -99,6 +114,26 @@ contract PFPDAOPool is
         // (, int256 price,,,) = _priceFeed.latestRoundData();
         // return price;
         return 10000000; // price 100000000 == 1 U for mock
+    }
+
+    function whitelistLoot(uint8 time_, bytes calldata _signature) external {
+        if (isWhitelistLooted[_msgSender()] == activeNonce) {
+            revert WhiteListUsed(activeNonce);
+        }
+        if (time_ == 0 || time_ > 10) {
+            revert InvaildLootTimes();
+        }
+        bytes32 digest = keccak256(abi.encodePacked(_msgSender(), time_, activeNonce)).toEthSignedMessageHash();
+        if (!signer.isValidSignatureNow(digest, _signature)) {
+            revert InvalidSignature();
+        }
+        if (time_ == 1) {
+            _loot1();
+        } else {
+            _lootN(time_);
+        }
+
+        isWhitelistLooted[_msgSender()] = activeNonce;
     }
 
     function _loot1() private {
@@ -188,10 +223,10 @@ contract PFPDAOPool is
         uint16 roleId;
         uint8 rarity;
 
-        // 进行随机数判断。先判断角色大保底，然后是角色保底，最后是10次保底
-        // 1. 角色大保底：每次抽到 **Legendary** 的角色如果不是本期up角色，下一次抽到 **Legendary** 的角色必定是本期up角色。
-        // 2. 角色保底：每90次抽卡必定获得一个 **Legendary** 传说级角色
-        // 3. 抽满10次保底，必定有个rare角色，4分之3出本期up角，4分之1出常驻池
+        // Random number judgment. First check the legendary character guarantee, then the character guarantee, and finally the 10-draw guarantee.
+        // 1. Legendary character guarantee: If a **Legendary** character is drawn and it is not the current up character, the next **Legendary** character drawn will definitely be the current up character.
+        // 2. Character guarantee: Every 90 draws will definitely get a **Legendary** character.
+        // 3. 10-draw guarantee: After 10 draws, there will definitely be a rare character. 3/4 of the time it will be the current up character, and 1/4 of the time it will be a permanent pool character.
 
         if (nextIsUpSSS[_msgSender()]) {
             // 角色大保底
@@ -201,7 +236,7 @@ contract PFPDAOPool is
             mintTimesForSSS[_msgSender()] = 0;
             mintTimesForUpSS[_msgSender()] += 1;
         } else if (mintTimesForSSS[_msgSender()] == 89) {
-            // 角色保底：每90次抽卡必定获得一个Legendary传说级角色
+            // Role guarantee: Every 90 draws will definitely get a Legendary character.
             if (normalLegendaryIds.length == 0) {
                 roleId = upLegendaryId;
             } else if (seed % (normalLegendaryIds.length + 1) == 0) {
@@ -265,22 +300,83 @@ contract PFPDAOPool is
     }
 
     /* admin functions */
-    function setPoolRoleIds(
-        uint16 upLegendaryId_,
-        uint16[] memory upRareIds_,
-        uint16[] memory normalLegendaryIds_,
-        uint16[] memory normalRareIds_,
-        uint16[] memory normalCommonIds_
-    ) external onlyOwner {
+    function setUpLegendaryId(uint16 upLegendaryId_) external onlyOwner {
         upLegendaryId = upLegendaryId_;
-        upRareIds = upRareIds_;
-        normalLegendaryIds = normalLegendaryIds_;
-        normalRareIds = normalRareIds_;
-        normalCommonIds = normalCommonIds_;
+    }
+
+    function setUpRareIds(uint16[] memory upRareIds_) external onlyOwner {
+        upRareIds = new uint16[](upRareIds_.length);
+        for (uint256 i = 0; i < upRareIds_.length; i++) {
+            upRareIds[i] = upRareIds_[i];
+        }
+    }
+
+    function setNormalLegendaryIds(uint16[] memory normalLegendaryIds_) external onlyOwner {
+        normalLegendaryIds = new uint16[](normalLegendaryIds_.length);
+        for (uint256 i = 0; i < normalLegendaryIds_.length; i++) {
+            normalLegendaryIds[i] = normalLegendaryIds_[i];
+        }
+    }
+
+    function setNormalRareIds(uint16[] memory normalRareIds_) external onlyOwner {
+        normalRareIds = new uint16[](normalRareIds_.length);
+        for (uint256 i = 0; i < normalRareIds_.length; i++) {
+            normalRareIds[i] = normalRareIds_[i];
+        }
+    }
+
+    function setNormalCommonIds(uint16[] memory normalCommonIds_) external onlyOwner {
+        normalCommonIds = new uint16[](normalCommonIds_.length);
+        for (uint256 i = 0; i < normalCommonIds_.length; i++) {
+            normalCommonIds[i] = normalCommonIds_[i];
+        }
+    }
+
+    function getUpRareIdsLength() external view returns (uint256) {
+        return upRareIds.length;
+    }
+
+    function getNormalLegendaryIdsLength() external view returns (uint256) {
+        return normalLegendaryIds.length;
+    }
+
+    function getNormalRareIdsLength() external view returns (uint256) {
+        return normalRareIds.length;
+    }
+
+    function getNormalCommonIdsLength() external view returns (uint256) {
+        return normalCommonIds.length;
     }
 
     function setDefaultRoleIdForNewUser(uint16 roleId_) external onlyOwner {
         _defaultRoleIdForNewUser = roleId_;
+    }
+
+    function setActiveNonce(uint8 nonce_) external onlyOwner {
+        activeNonce = nonce_;
+    }
+
+    // withdraw eth
+    function withdraw() external onlyOwner {
+        uint256 balance = address(this).balance;
+        payable(treasury).transfer(balance);
+    }
+
+    // set treasury
+    function setTreasury(address treasury_) external onlyOwner {
+        treasury = treasury_;
+    }
+
+    function setSigner(address signer_) external onlyOwner {
+        signer = signer_;
+    }
+
+    function setPriceLootOne(int256 price_) external onlyOwner {
+        priceLootOne = price_;
+    }
+
+    function setPriceLootTen(int256 price_) external onlyOwner {
+        priceLootTen = price_;
     }
 
     /* upgradeable functions */

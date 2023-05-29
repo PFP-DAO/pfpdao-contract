@@ -8,11 +8,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "erc-3525/ERC3525Upgradeable.sol";
 
-import "@chainlink/interfaces/AggregatorV3Interface.sol";
-
-import "forge-std/console2.sol";
-
 error IsNotOwner();
+error Soulbound();
 
 contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC3525Upgradeable, UUPSUpgradeable {
     uint32[89] public expTable;
@@ -215,6 +212,20 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     function getImplementation() external view returns (address) {
         return _getImplementation();
+    }
+
+    function _beforeValueTransfer(
+        address from_,
+        address to_,
+        uint256 fromTokenId_,
+        uint256 toTokenId_,
+        uint256 slot_,
+        uint256 value_
+    ) internal virtual override {
+        super._beforeValueTransfer(from_, to_, fromTokenId_, toTokenId_, slot_, value_);
+        if (getLevel(slot_) < 60 && from_ != address(0) && to_ != address(0)) {
+            revert Soulbound();
+        }
     }
 
     /**

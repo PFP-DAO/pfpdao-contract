@@ -21,6 +21,7 @@ contract ComputeSlot is Script {
 
     function run() public view {
         uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 1, 2, 1, 0);
+        // uint256 tempSlot = 0x0000000000000000000000000000000000000000040100000004010000000000;
         console2.log("tempSlot", tempSlot);
     }
 }

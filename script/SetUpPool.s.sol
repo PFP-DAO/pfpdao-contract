@@ -34,7 +34,12 @@ contract SetUpPool is Script {
         uint16[] memory normalRareIds = new uint16[](0);
         uint16[] memory normalCommonIds = new uint16[](1);
         normalCommonIds[0] = 0;
-        wrappedPoolV1.setPoolRoleIds(upLegendaryId, upRareIds, normalLegendaryIds, normalRareIds, normalCommonIds);
+        wrappedPoolV1.setUpLegendaryId(upLegendaryId);
+        wrappedPoolV1.setUpRareIds(upRareIds);
+        wrappedPoolV1.setNormalLegendaryIds(normalLegendaryIds);
+        wrappedPoolV1.setNormalRareIds(normalRareIds);
+        wrappedPoolV1.setNormalCommonIds(normalCommonIds);
+
         wrappedEquipV1.addActivePool(pool);
         wrappedRoleAV1.addActivePool(pool);
 

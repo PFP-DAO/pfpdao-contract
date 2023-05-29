@@ -33,6 +33,9 @@ contract Deploy is Script {
         address deployer = vm.rememberKey(privKey);
         vm.startBroadcast(deployer);
 
+        address treasury = deployer;
+        // address treasury = vm.envAddress("TREASURY"); // mainnet
+
         implementationPoolV1 = new PFPDAOPool();
         implementationEquipV1 = new PFPDAOEquipment();
         implementationRoleAV1 = new PFPDAORole();
@@ -48,9 +51,14 @@ contract Deploy is Script {
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
 
         // 初始化合约
+        address signer = vm.envAddress("SIGNER");
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedEquipV1.initialize();
         wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
+
+        wrappedPoolV1.setTreasury(treasury);
+        wrappedPoolV1.setSigner(signer);
+        wrappedPoolV1.setActiveNonce(1);
 
         vm.stopBroadcast();
 

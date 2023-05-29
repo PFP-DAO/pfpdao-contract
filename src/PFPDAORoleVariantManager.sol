@@ -13,7 +13,7 @@ abstract contract PFPDAORoleVariantManager is Initializable {
 
     function __PFPDAORoleVariantManager_init_unchained() internal onlyInitializing {}
 
-    function getRoleVariant(address account, uint16 roleId) public returns (uint32) {
+    function getRoleVariant(address account, uint16 roleId) internal returns (uint32) {
         if (addressToVariant[account][roleId] == 0) {
             lastVariant[roleId] += 1;
             addressToVariant[account][roleId] = lastVariant[roleId];

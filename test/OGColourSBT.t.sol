@@ -71,7 +71,7 @@ contract OGColourSBTTest is PRBTest {
         vm.startPrank(user1);
         wrappedSBTV1.mint();
         string memory uri = wrappedSBTV1.uri(2);
-        assertEq(uri, "https://pfpdao-test-0.4everland.store/ogSBT/metadata/2");
+        assertEq(uri, "https://pfpdao-0.4everland.store/ogSBT/metadata/2");
         assertEq(wrappedSBTV1.uri(0), "");
         assertEq(wrappedSBTV1.uri(6), "");
         vm.stopPrank();
