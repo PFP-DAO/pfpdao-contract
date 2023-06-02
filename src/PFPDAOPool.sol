@@ -168,7 +168,7 @@ contract PFPDAOPool is
         uint256[] memory slots = new uint256[](time_);
         uint8[] memory balance = new uint8[](time_);
 
-        for (uint8 i = 0; i < 10; i++) {
+        for (uint8 i = 0; i < time_; i++) {
             uint256 tmpSlot = _mintLogic(i);
             bool found = false;
             for (uint8 j = 0; j < slots.length; j++) {

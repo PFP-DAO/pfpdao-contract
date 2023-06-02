@@ -338,6 +338,18 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.whitelistLoot(1, signature);
     }
 
+    function testWhitelistLoot6() public {
+        wrappedPoolV1.setActiveNonce(1);
+
+        // server sign the messageHash
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(signerPrivateKey, keccak256(abi.encodePacked(user1, uint8(2), uint8(1))).toEthSignedMessageHash()); // user1 have 2 freeloot at batch 1
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(user1);
+        wrappedPoolV1.whitelistLoot(2, signature);
+    }
+
     // test withdraw
     function testWithdraw() public {
         vm.prank(user1);
