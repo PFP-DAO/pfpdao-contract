@@ -21,7 +21,7 @@ contract UpgradePool is Script {
 
         wrappedPoolV1.upgradeTo(address(implementationV2));
 
-        PFPDAOPool wrappedPoolV2 = PFPDAOPool(pool);
+        // PFPDAOPool wrappedPoolV2 = PFPDAOPool(pool);
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
         // uint16 upLegendaryId = 1;
@@ -42,8 +42,8 @@ contract UpgradePool is Script {
         // wrappedPoolV2.setTreasury(vm.envAddress("TREASURY"));
         // wrappedPoolV2.setSigner(vm.envAddress("SIGNER"));
 
-        wrappedPoolV2.setPriceLootOne(vm.envInt("PRICE_ONE"));
-        wrappedPoolV2.setPriceLootTen(vm.envInt("PRICE_TEN"));
+        // wrappedPoolV2.setPriceLootOne(vm.envInt("PRICE_ONE"));
+        // wrappedPoolV2.setPriceLootTen(vm.envInt("PRICE_TEN"));
         address roleA = address(wrappedPoolV1.roleNFT());
         address equip = address(wrappedPoolV1.equipmentNFT());
         assert(roleA == vm.envAddress("ROLEA_ADDRESS"));
@@ -55,11 +55,11 @@ contract UpgradePool is Script {
         assert(wrappedPoolV1.treasury() == vm.envAddress("TREASURY"));
         assert(wrappedPoolV1.signer() == vm.envAddress("SIGNER"));
 
-        console2.log("getupLegendaryId:", wrappedPoolV2.upLegendaryId());
-        console2.log("getUpRareIdsLength:", wrappedPoolV2.getUpRareIdsLength());
-        console2.log("getNormalLegendaryIdsLength:", wrappedPoolV2.getNormalLegendaryIdsLength());
-        console2.log("getNormalRareIdsLength:", wrappedPoolV2.getNormalRareIdsLength());
-        console2.log("getNormalCommonIdsLength:", wrappedPoolV2.getNormalCommonIdsLength());
+        assert(wrappedPoolV1.upLegendaryId() == 1);
+        assert(wrappedPoolV1.getUpRareIdsLength() == 3);
+        assert(wrappedPoolV1.getNormalLegendaryIdsLength() == 0);
+        assert(wrappedPoolV1.getNormalRareIdsLength() == 0);
+        assert(wrappedPoolV1.getNormalCommonIdsLength() == 1);
 
         vm.stopBroadcast();
     }

@@ -5,6 +5,8 @@ import "./PFPDAO.sol";
 import {PFPDAORoleVariantManager} from "./PFPDAORoleVariantManager.sol";
 
 error InvalidSlot();
+error NotAllowed();
+error NotOwner();
 
 contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
     using StringsUpgradeable for uint256;
@@ -13,6 +15,8 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
     using StringsUpgradeable for uint8;
 
     mapping(uint16 => string) public roldIdToName;
+
+    address public equipmentContract;
 
     event LevelResult(uint256 indexed nftId, uint8 newLevel, uint32 newExp);
 
@@ -43,18 +47,45 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
 
     function mint(address to_, uint256 slot_, uint256 balance_) public {
         // only active pool can mint
-        require(activePools[msg.sender], "only active pool can mint");
+        if (!activePools[_msgSender()]) {
+            revert NotAllowed();
+        }
         _mint(to_, slot_, balance_);
     }
 
-    function levelUp(uint256 nftId_, uint32 addExp_) public returns (uint256) {
+    function _levelUp(uint256 nftId_, uint32 addExp_) private returns (uint256) {
         uint256 oldSlot = slotOf(nftId_);
         (uint256 newSlot,) = addExp(oldSlot, addExp_);
         _burn(nftId_);
-        _mint(msg.sender, nftId_, newSlot, 1);
+        _mint(_msgSender(), nftId_, newSlot, 1);
 
         emit LevelResult(nftId_, getLevel(newSlot), getExp(newSlot));
         return newSlot;
+    }
+
+    function levelUpWhenLoot(uint256 nftId_, uint32 addExp_) public returns (uint256) {
+        if (!activePools[_msgSender()]) {
+            revert NotAllowed();
+        }
+        return _levelUp(nftId_, addExp_);
+    }
+
+    function levelUpByBurnEquipments(uint256 nftId_, uint256[] calldata equipmentIds) external returns (uint256) {
+        require(equipmentIds.length > 0, "EquipmentIds is empty");
+        if (ownerOf(nftId_) != _msgSender()) {
+            revert NotOwner();
+        }
+        uint32 totalExp = 0;
+        PFPDAO equip = PFPDAO(equipmentContract);
+        for (uint256 i = 0; i < equipmentIds.length; i++) {
+            if (equip.ownerOf(equipmentIds[i]) != _msgSender()) {
+                revert NotOwner();
+            }
+            uint256 balance = equip.balanceOf(equipmentIds[i]);
+            equip.burn(equipmentIds[i]);
+            totalExp += 8 * uint32(balance);
+        }
+        return _levelUp(nftId_, totalExp);
     }
 
     function getStyle(uint256 slot_) public pure returns (uint8) {
@@ -88,5 +119,9 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
 
     function setRoleName(uint16 roleId_, string calldata name_) public onlyOwner {
         roldIdToName[roleId_] = name_;
+    }
+
+    function setEquipmentContract(address equipmentContract_) public onlyOwner {
+        equipmentContract = equipmentContract_;
     }
 }

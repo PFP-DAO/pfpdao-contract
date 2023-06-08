@@ -9,7 +9,8 @@ import {PFPDAOPool} from "../src/PFPDAOPool.sol";
 import {PFPDAORole} from "../src/PFPDAORole.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
-// import {PFPDAOV2} from "../src/PFPDAOV2.sol";
+
+import {InitPFPDAO} from "./InitPFPDAO.s.sol";
 
 contract Deploy is Script {
     PFPDAOPool implementationPoolV1;
@@ -27,14 +28,9 @@ contract Deploy is Script {
     function setUp() public {}
 
     function run() public {
-        // vm read from .env
-
         uint256 privKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.rememberKey(privKey);
         vm.startBroadcast(deployer);
-
-        address treasury = deployer;
-        // address treasury = vm.envAddress("TREASURY"); // mainnet
 
         implementationPoolV1 = new PFPDAOPool();
         implementationEquipV1 = new PFPDAOEquipment();
@@ -51,29 +47,21 @@ contract Deploy is Script {
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
 
         // 初始化合约
-        address signer = vm.envAddress("SIGNER");
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedEquipV1.initialize();
         wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
 
-        wrappedPoolV1.setTreasury(treasury);
-        wrappedPoolV1.setSigner(signer);
-        wrappedPoolV1.setActiveNonce(1);
+        // 初始化设置
+        address poolAddress = address(wrappedPoolV1);
+        address equipAddress = address(wrappedEquipV1);
+        address roleAAddress = address(wrappedRoleAV1);
 
+        InitPFPDAO initPFPDAOContract = new InitPFPDAO();
+        initPFPDAOContract.initAll(poolAddress, roleAAddress, equipAddress, deployer);
+
+        console2.log("Pool address: %s", poolAddress);
+        console2.log("Equip address: %s", equipAddress);
+        console2.log("RoleA address: %s", roleAAddress);
         vm.stopBroadcast();
-
-        // PFPDAO implementationV1 = new PFPDAO();
-
-        // deploy proxy contract and point it to implementation
-        // proxy = new UUPSProxy(address(implementationV1), "");
-
-        // wrap in ABI to support easier calls
-        // wrappedProxyV1 = PFPDAO(address(proxy));
-
-        // new implementation
-        // PFPDAOV2 implementationV2 = new PFPDAOV2();
-        // wrappedProxyV1.upgradeTo(address(implementationV2));
-
-        // wrappedProxyV2 = PFPDAOV2(address(proxy));
     }
 }

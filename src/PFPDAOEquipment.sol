@@ -12,9 +12,7 @@ contract PFPDAOEquipment is PFPDAO {
         __PFPDAO_init("PFPDAOEquipment", "PFPE");
     }
 
-    function mint(address to_, uint256 slot_, uint256 balance_) public returns (uint256) {
-        // only active pool can mint
-        require(activePools[msg.sender], "only active pool can mint");
+    function mint(address to_, uint256 slot_, uint256 balance_) public onlyActivePool returns (uint256) {
         return _mint(to_, slot_, balance_);
     }
 }

@@ -10,6 +10,8 @@ import "erc-3525/ERC3525Upgradeable.sol";
 
 error IsNotOwner();
 error Soulbound();
+error NotApprove();
+error NotBurner(address);
 
 contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC3525Upgradeable, UUPSUpgradeable {
     uint32[89] public expTable;
@@ -17,6 +19,8 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     // approved pools
     mapping(address => bool) public activePools;
+
+    address[] public allowedBurners;
 
     modifier onlyActivePool() {
         require(activePools[msg.sender], "only active pool can mint");
@@ -196,6 +200,30 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     function isActivePool(address pool_) external view returns (bool) {
         return activePools[pool_];
+    }
+
+    function burn(uint256 tokenId_) public {
+        if (!isAllowedBurner(_msgSender())) {
+            revert NotBurner(_msgSender());
+        }
+        _burn(tokenId_);
+    }
+
+    function isAllowedBurner(address _address) private view returns (bool) {
+        for (uint256 i = 0; i < allowedBurners.length; i++) {
+            if (allowedBurners[i] == _address) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function getAllowedBurner(uint256 index_) public view returns (address) {
+        return allowedBurners[index_];
+    }
+
+    function updateAllowedBurners(address[] calldata _allowedBurners) external onlyOwner {
+        allowedBurners = _allowedBurners;
     }
 
     /* admin functions */

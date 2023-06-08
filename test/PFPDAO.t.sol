@@ -4,9 +4,9 @@ pragma solidity ^0.8.18;
 import {PRBTest} from "@prb/test/PRBTest.sol";
 import "forge-std/console2.sol";
 
-import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
+import {PFPDAOEquipment, NotBurner} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool} from "../src/PFPDAOPool.sol";
-import {PFPDAORole, Soulbound, InvalidSlot} from "../src/PFPDAORole.sol";
+import {PFPDAORole, Soulbound, InvalidSlot, NotAllowed, NotOwner} from "../src/PFPDAORole.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 
@@ -85,6 +85,8 @@ contract _PFPDAOTest is PRBTest {
 
         wrappedPoolV1.setTreasury(treasury);
         wrappedPoolV1.setSigner(signer);
+
+        wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);
@@ -169,19 +171,19 @@ contract _PFPDAOTest is PRBTest {
         vm.startPrank(user1);
         wrappedPoolV1.loot10{value: 22 ether}();
 
-        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        vm.expectRevert(Soulbound.selector);
         wrappedRoleAV1.safeTransferFrom(user1, address(this), 1);
 
-        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        vm.expectRevert(Soulbound.selector);
         wrappedRoleAV1.transferFrom(user1, address(this), 1);
 
-        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        vm.expectRevert(Soulbound.selector);
         wrappedEquipV1.safeTransferFrom(user1, address(this), 1);
 
-        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        vm.expectRevert(Soulbound.selector);
         wrappedEquipV1.transferFrom(user1, address(this), 1);
 
-        vm.expectRevert(abi.encodeWithSelector(Soulbound.selector));
+        vm.expectRevert(Soulbound.selector);
         wrappedEquipV1.transferFrom(1, address(this), 9);
     }
 
@@ -227,5 +229,133 @@ contract _PFPDAOTest is PRBTest {
 
         vm.expectRevert(InvalidSlot.selector);
         wrappedRoleAV1.airdrop(recipients, 5, 1, 1);
+    }
+
+    function testEquipMint() public {
+        vm.startPrank(user1);
+        vm.expectRevert("only active pool can mint");
+        wrappedEquipV1.mint(user1, 1, 1);
+    }
+
+    function testLevelUp() public {
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+        vm.expectRevert(NotAllowed.selector);
+        wrappedRoleAV1.levelUpWhenLoot(1, 1);
+    }
+
+    function setAllowBurners() internal {
+        address[] memory allowedBurners = new address[](1);
+        allowedBurners[0] = address(wrappedRoleAV1);
+        wrappedEquipV1.updateAllowedBurners(allowedBurners);
+    }
+
+    function testAllowBurners() public {
+        setAllowBurners();
+        assertEq(wrappedEquipV1.getAllowedBurner(0), address(wrappedRoleAV1));
+    }
+
+    function testBurn() public {
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+        // if no allowed burner, revert
+        vm.expectRevert(abi.encodeWithSelector(NotBurner.selector, user1));
+        wrappedEquipV1.burn(1);
+    }
+
+    function testLevelUpByBurnEquipmentSingle() public {
+        setAllowBurners();
+
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        // user should have 1 role and 1 equip, equip balance is 9
+        assertEq(wrappedRoleAV1.balanceOf(user1), 1);
+        assertEq(wrappedEquipV1.balanceOf(user1), 1);
+        assertEq(wrappedEquipV1.balanceOf(1), 9);
+
+        uint256[] memory equipmentIds = new uint256[](1);
+        equipmentIds[0] = 1;
+        wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIds);
+
+        // roleA nft 1 should have 72 exp
+        assertEq(wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(1)), 11);
+        assertEq(wrappedRoleAV1.getLevel(wrappedRoleAV1.slotOf(1)), 6);
+    }
+
+    function testLevelUpByBurnEquipmentBatch() public {
+        setAllowBurners();
+
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        // user should have 2 role and 2 equip, equip balance is 9, 9
+        assertEq(wrappedRoleAV1.balanceOf(user1), 2);
+        assertEq(wrappedEquipV1.balanceOf(user1), 2);
+        assertEq(wrappedEquipV1.balanceOf(1), 9);
+        assertEq(wrappedEquipV1.balanceOf(2), 9);
+
+        uint256[] memory equipmentIds = new uint256[](2);
+        equipmentIds[0] = 1;
+        equipmentIds[1] = 2;
+        wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIds);
+
+        // roleA nft 1 should have 144 exp
+        assertEq(wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(1)), 9);
+        assertEq(wrappedRoleAV1.getLevel(wrappedRoleAV1.slotOf(1)), 10);
+
+        // roleA nft 2 should have 0 exp
+        assertEq(wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(2)), 0);
+        assertEq(wrappedRoleAV1.getLevel(wrappedRoleAV1.slotOf(2)), 1);
+
+        // equip nft 1 and 2 should be burned
+        assertEq(wrappedEquipV1.balanceOf(user1), 0);
+        vm.expectRevert("ERC3525: invalid token ID");
+        wrappedEquipV1.balanceOf(1);
+        vm.expectRevert("ERC3525: invalid token ID");
+        wrappedEquipV1.balanceOf(2);
+        assertEq(wrappedEquipV1.totalSupply(), 0);
+    }
+
+    function testLevelUpByBurnEquipmentError() public {
+        setAllowBurners();
+        // test equipmentIds is empty
+        vm.prank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        vm.deal(user2, 22 ether);
+        vm.prank(user2);
+        vm.warp(6);
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        // equipmentIds is empty
+        uint256[] memory equipmentIdsEmpty = new uint256[](0);
+        vm.expectRevert("EquipmentIds is empty");
+        wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsEmpty);
+
+        uint256[] memory equipmentIdsUser1 = new uint256[](1);
+        equipmentIdsUser1[0] = 1;
+
+        // user2 levelup use user1's equipment
+        vm.prank(user2);
+        vm.expectRevert(NotOwner.selector);
+        wrappedRoleAV1.levelUpByBurnEquipments(2, equipmentIdsUser1);
+
+        // user1 levelup NFT belong to user2
+        vm.prank(user1);
+        vm.expectRevert(NotOwner.selector);
+        wrappedRoleAV1.levelUpByBurnEquipments(2, equipmentIdsUser1);
+
+        // user1 levelup NFT not exist
+        vm.prank(user1);
+        vm.expectRevert("ERC3525: invalid token ID");
+        wrappedRoleAV1.levelUpByBurnEquipments(100, equipmentIdsUser1);
+
+        // user1 levelup use burned equipments
+        vm.prank(user1);
+        wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsUser1);
+        vm.expectRevert(NotOwner.selector);
+        wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsUser1);
     }
 }

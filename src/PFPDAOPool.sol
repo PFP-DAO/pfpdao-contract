@@ -17,7 +17,6 @@ import {PFPDAORole} from "./PFPDAORole.sol";
 
 // import "forge-std/console2.sol";
 
-// error FreeLooted(address);
 error InvalidSignature();
 error WhiteListUsed(uint8);
 error InvaildLootTimes();
@@ -161,7 +160,7 @@ contract PFPDAOPool is
     function loot1(uint16 captainId_, uint256 nftId_) external payable loot1PayVerify {
         roleIdPoolBalance[captainId_] += msg.value / 2;
         _loot1();
-        roleNFT.levelUp(nftId_, 2);
+        roleNFT.levelUpWhenLoot(nftId_, 2);
     }
 
     function _lootN(uint8 time_) private {
@@ -211,7 +210,7 @@ contract PFPDAOPool is
     function loot10(uint16 captainId_, uint256 nftId_) external payable loot10PayVerify {
         roleIdPoolBalance[captainId_] += msg.value / 2;
         _lootN(10);
-        roleNFT.levelUp(nftId_, 20);
+        roleNFT.levelUpWhenLoot(nftId_, 20);
     }
 
     function getGuarInfo(address user_) external view returns (uint8, uint8, bool) {
@@ -348,6 +347,10 @@ contract PFPDAOPool is
         return normalCommonIds.length;
     }
 
+    function defaultCaptainIdForNewUser() external view returns (uint16) {
+        return _defaultRoleIdForNewUser;
+    }
+
     function setDefaultRoleIdForNewUser(uint16 roleId_) external onlyOwner {
         _defaultRoleIdForNewUser = roleId_;
     }
@@ -377,6 +380,10 @@ contract PFPDAOPool is
 
     function setPriceLootTen(int256 price_) external onlyOwner {
         priceLootTen = price_;
+    }
+
+    function getRoleIdPoolBalance(uint16 roleId_) external view returns (uint256) {
+        return roleIdPoolBalance[roleId_ - 1];
     }
 
     /* upgradeable functions */
