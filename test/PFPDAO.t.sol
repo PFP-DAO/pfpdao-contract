@@ -95,6 +95,11 @@ contract _PFPDAOTest is PRBTest {
         vm.warp(3);
     }
 
+    function _loot10GetARole() private {
+        vm.prank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+    }
+
     function testCanInitialize() public {
         // 测试初始化是否成功
         assertEq(wrappedEquipV1.symbol(), "PFPE");
@@ -112,52 +117,54 @@ contract _PFPDAOTest is PRBTest {
 
     // Test Role function
     function testGetSlotProps() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 1, 0);
+        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 1);
         assertEq(wrappedRoleAV1.getRoleId(tempSlot), 1);
         assertEq(wrappedRoleAV1.getRarity(tempSlot), 0);
         assertEq(wrappedRoleAV1.getVariant(tempSlot), 1023);
-        assertEq(wrappedRoleAV1.getLevel(tempSlot), 1);
-        assertEq(wrappedRoleAV1.getExp(tempSlot), 0);
+        assertEq(wrappedRoleAV1.getStyle(tempSlot), 1);
     }
 
     function testAddExp_1() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 1, 0); // level 1, exp 0
-        (uint256 newSlot, uint32 overflowExp) = wrappedRoleAV1.addExp(tempSlot, 21); // add 21 exp
-        assertEq(wrappedRoleAV1.getLevel(newSlot), 3); // should be level3
-        assertEq(wrappedRoleAV1.getExp(newSlot), 0); // and exp0
+        _loot10GetARole();
+        (uint8 newLevel, uint32 newExp, uint32 overflowExp) = wrappedRoleAV1.addRoleExp(1, 21);
+        assertEq(newLevel, 3);
+        assertEq(newExp, 0);
         assertEq(overflowExp, 0);
     }
 
     function testAddExp_2() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 1, 0); // level 1, exp 0
-        (uint256 newSlot, uint32 overflowExp) = wrappedRoleAV1.addExp(tempSlot, 15); // add 15 exp
-        assertEq(wrappedRoleAV1.getLevel(newSlot), 2); // should be level2
-        assertEq(wrappedRoleAV1.getExp(newSlot), 5); // and exp 5
+        _loot10GetARole();
+        (uint8 newLevel, uint32 newExp, uint32 overflowExp) = wrappedRoleAV1.addRoleExp(1, 15);
+        assertEq(newLevel, 2);
+        assertEq(newExp, 5);
         assertEq(overflowExp, 0);
     }
 
     function testAddExp_3() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 19, 0); // level 19, exp 0
-        (uint256 newSlot, uint32 overflowExp) = wrappedRoleAV1.addExp(tempSlot, 57); // add 57 exp
-        assertEq(wrappedRoleAV1.getLevel(newSlot), 19); // should be level 19
-        assertEq(wrappedRoleAV1.getExp(newSlot), 56); // and exp 56
-        assertEq(overflowExp, 1); // and overflow
+        _loot10GetARole();
+        wrappedRoleAV1.setRoleExp(1, 19, 0);
+        (uint8 newLevel, uint32 newExp, uint32 overflowExp) = wrappedRoleAV1.addRoleExp(1, 57);
+        assertEq(newLevel, 19);
+        assertEq(newExp, 56);
+        assertEq(overflowExp, 1);
     }
 
     function testAddExp_4() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 19, 0); // level 19, exp 0
-        (uint256 newSlot, uint32 overflowExp) = wrappedRoleAV1.addExp(tempSlot, 56); // add 56 exp
-        assertEq(wrappedRoleAV1.getLevel(newSlot), 19); // should be level 19
-        assertEq(wrappedRoleAV1.getExp(newSlot), 56); // and exp 56
+        _loot10GetARole();
+        wrappedRoleAV1.setRoleExp(1, 19, 0);
+        (uint8 newLevel, uint32 newExp, uint32 overflowExp) = wrappedRoleAV1.addRoleExp(1, 56);
+        assertEq(newLevel, 19);
+        assertEq(newExp, 56);
         assertEq(overflowExp, 0);
     }
 
     function testAddExp_5() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 19, 57); // level 19, exp 57
-        (uint256 newSlot, uint32 overflowExp) = wrappedRoleAV1.addExp(tempSlot, 1); // add 1 exp
-        assertEq(wrappedRoleAV1.getLevel(newSlot), 19); // should be level 19
-        assertEq(wrappedRoleAV1.getExp(newSlot), 56); // and exp 56
-        assertEq(overflowExp, 2); // will have more overflow exp, but not save in slot
+        _loot10GetARole();
+        wrappedRoleAV1.setRoleExp(1, 19, 57);
+        (uint8 newLevel, uint32 newExp, uint32 overflowExp) = wrappedRoleAV1.addRoleExp(1, 1);
+        assertEq(newLevel, 19);
+        assertEq(newExp, 56);
+        assertEq(overflowExp, 2);
     }
 
     function testActivePool() public {
@@ -188,8 +195,7 @@ contract _PFPDAOTest is PRBTest {
     }
 
     function testTokenURI() public {
-        vm.prank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        _loot10GetARole();
 
         string memory roleUri = wrappedRoleAV1.tokenURI(1);
         assertEq(roleUri, "https://pfpdao-0.4everland.store/metadata/4/V1_0/role_4_V1_0_1_Mico.json");
@@ -279,8 +285,8 @@ contract _PFPDAOTest is PRBTest {
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIds);
 
         // roleA nft 1 should have 72 exp
-        assertEq(wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(1)), 11);
-        assertEq(wrappedRoleAV1.getLevel(wrappedRoleAV1.slotOf(1)), 6);
+        assertEq(wrappedRoleAV1.getExp(1), 11);
+        assertEq(wrappedRoleAV1.getLevel(1), 6);
     }
 
     function testLevelUpByBurnEquipmentBatch() public {
@@ -302,12 +308,12 @@ contract _PFPDAOTest is PRBTest {
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIds);
 
         // roleA nft 1 should have 144 exp
-        assertEq(wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(1)), 9);
-        assertEq(wrappedRoleAV1.getLevel(wrappedRoleAV1.slotOf(1)), 10);
+        assertEq(wrappedRoleAV1.getExp(1), 9);
+        assertEq(wrappedRoleAV1.getLevel(1), 10);
 
         // roleA nft 2 should have 0 exp
-        assertEq(wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(2)), 0);
-        assertEq(wrappedRoleAV1.getLevel(wrappedRoleAV1.slotOf(2)), 1);
+        assertEq(wrappedRoleAV1.getExp(2), 0);
+        assertEq(wrappedRoleAV1.getLevel(2), 1);
 
         // equip nft 1 and 2 should be burned
         assertEq(wrappedEquipV1.balanceOf(user1), 0);
@@ -321,8 +327,7 @@ contract _PFPDAOTest is PRBTest {
     function testLevelUpByBurnEquipmentError() public {
         setAllowBurners();
         // test equipmentIds is empty
-        vm.prank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        _loot10GetARole();
 
         vm.deal(user2, 22 ether);
         vm.prank(user2);
@@ -357,5 +362,69 @@ contract _PFPDAOTest is PRBTest {
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsUser1);
         vm.expectRevert(NotOwner.selector);
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsUser1);
+    }
+
+    function testReachLimitLevel() public {
+        _loot10GetARole();
+
+        assertFalse(wrappedRoleAV1.reachLimitLevel(1));
+
+        wrappedRoleAV1.setRoleExp(1, 19, 56);
+        assertTrue(wrappedRoleAV1.reachLimitLevel(1));
+    }
+
+    function testGenerateSlotWhenAwake() public {
+        uint256 oldSlot = wrappedRoleAV1.generateSlot(2, 1, 88, 1); // 88 variant's roldId 1 style1
+        uint256 newSlot = wrappedRoleAV1.generateSlotWhenAwake(oldSlot, 10); // 10 variant's roldId 1 style2
+        assertEq(wrappedRoleAV1.getRoleId(newSlot), 2);
+        assertEq(wrappedRoleAV1.getRarity(newSlot), 1);
+        assertEq(wrappedRoleAV1.getStyle(newSlot), 2);
+        assertEq(wrappedRoleAV1.getVariant(newSlot), 10);
+        uint32[] memory oldVariants = wrappedRoleAV1.getVariants(newSlot);
+
+        assertEq(oldVariants[0], 88);
+        assertEq(oldVariants.length, 1);
+
+        uint256 newSlot2 = wrappedRoleAV1.generateSlotWhenAwake(newSlot, 3);
+        assertEq(wrappedRoleAV1.getRoleId(newSlot2), 2);
+        assertEq(wrappedRoleAV1.getRarity(newSlot2), 1);
+        assertEq(wrappedRoleAV1.getStyle(newSlot2), 3);
+        assertEq(wrappedRoleAV1.getVariant(newSlot2), 3);
+        uint32[] memory oldVariants2 = wrappedRoleAV1.getVariants(newSlot2);
+
+        assertEq(oldVariants2[0], 88);
+        assertEq(oldVariants2[1], 10);
+        assertEq(oldVariants2.length, 2);
+    }
+
+    function testAwaken() public {
+        _loot10GetARole();
+
+        uint256 highNFTId = 1;
+        wrappedRoleAV1.setRoleExp(1, 19, 56);
+        assertEq(wrappedRoleAV1.getLevel(highNFTId), 19);
+        assertEq(wrappedRoleAV1.getExp(highNFTId), 56);
+        address[] memory recipients = new address[](1);
+        recipients[0] = user1;
+        wrappedRoleAV1.airdrop(recipients, 4, 1, 1);
+        uint256 oldSlot1 = wrappedRoleAV1.slotOf(highNFTId);
+        assertEq(wrappedRoleAV1.getRoleId(oldSlot1), 4);
+        uint256 oldSlot2 = wrappedRoleAV1.slotOf(2);
+        assertEq(wrappedRoleAV1.getRoleId(oldSlot2), 4);
+        assertEq(wrappedRoleAV1.balanceOf(user1), 2); // user1 has 2 nft
+
+        vm.prank(user1);
+        wrappedRoleAV1.awake(1, 2);
+        uint256 newSlot = wrappedRoleAV1.slotOf(1);
+
+        assertEq(wrappedRoleAV1.getRoleId(newSlot), 4);
+        assertEq(wrappedRoleAV1.getStyle(newSlot), 2);
+        assertEq(wrappedRoleAV1.getLevel(highNFTId), 20);
+        assertEq(wrappedRoleAV1.getExp(highNFTId), 0);
+        assertEq(wrappedRoleAV1.getVariant(newSlot), 1);
+
+        vm.expectRevert("ERC3525: invalid token ID");
+        wrappedRoleAV1.balanceOf(2); // nft 2 should be burned
+        assertEq(wrappedRoleAV1.balanceOf(user1), 1); // user1 has 1 nft now
     }
 }

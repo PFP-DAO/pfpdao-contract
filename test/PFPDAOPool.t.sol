@@ -171,7 +171,7 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.loot10{value: 22 ether}();
         uint16 captainId = wrappedRoleAV1.getRoleId(wrappedRoleAV1.slotOf(1));
         wrappedPoolV1.loot1{value: 2.8 ether}(captainId, 1); // first nftid will 1
-        uint32 exp = wrappedRoleAV1.getExp(wrappedRoleAV1.slotOf(1));
+        uint32 exp = wrappedRoleAV1.getExp(1);
         assertEq(exp, 2);
     }
 
@@ -181,15 +181,14 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.loot10{value: 22 ether}();
         uint256 roleSlot = wrappedRoleAV1.slotOf(1);
         uint16 captainId = wrappedRoleAV1.getRoleId(roleSlot);
-        (uint256 newSlot,) = wrappedRoleAV1.addExp(roleSlot, 20);
-        uint32 expExpect = wrappedRoleAV1.getExp(newSlot);
-        uint8 levelExpect = wrappedRoleAV1.getLevel(newSlot);
-        assertEq(expExpect, 10);
-        assertEq(levelExpect, 2);
+        uint32 expExpect = wrappedRoleAV1.getExp(1);
+        uint8 levelExpect = wrappedRoleAV1.getLevel(1);
+        assertEq(expExpect, 0);
+        assertEq(levelExpect, 1);
+
         wrappedPoolV1.loot10{value: 22 ether}(captainId, 1); // first nftid will 1
-        uint256 roleSlotAfterlevelUp = wrappedRoleAV1.slotOf(1);
-        uint32 expActual = wrappedRoleAV1.getExp(roleSlotAfterlevelUp);
-        uint8 levelActual = wrappedRoleAV1.getLevel(roleSlotAfterlevelUp);
+        uint32 expActual = wrappedRoleAV1.getExp(1);
+        uint8 levelActual = wrappedRoleAV1.getLevel(1);
         assertEq(expActual, 10);
         assertEq(levelActual, 2);
     }

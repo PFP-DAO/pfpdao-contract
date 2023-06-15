@@ -36,7 +36,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     function __PFPDAO_init_unchained() internal onlyInitializing {
         expTable = [
-            10,
+            10, //1 to 2
             11,
             12,
             13,
@@ -54,7 +54,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             42,
             46,
             51,
-            56,
+            56, // 19 to 20
             61,
             67,
             74,
@@ -129,16 +129,11 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
         levelNeedAwakening = [20, 40, 60, 80, 90];
     }
 
-    function generateSlot(uint16 roleId_, uint8 rarity_, uint32 variant_, uint8 level_, uint32 exp_)
-        public
-        pure
-        returns (uint256)
-    {
+    function generateSlot(uint16 roleId_, uint8 rarity_, uint32 variant_, uint8 style_) public pure returns (uint256) {
         uint256 slot = uint256(roleId_) << 88;
         slot |= uint256(rarity_) << 80;
         slot |= uint256(variant_) << 48;
-        slot |= uint256(level_) << 40;
-        slot |= uint256(exp_) << 8;
+        slot |= uint256(style_) << 40;
         return slot;
     }
 
@@ -155,47 +150,18 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
         return variant;
     }
 
-    function getLevel(uint256 slot_) public pure returns (uint8) {
-        uint8 level = uint8((slot_ >> 40) & 0xFF);
-        return level;
-    }
-
-    function getExp(uint256 slot_) public pure returns (uint32) {
-        return uint32(slot_ >> 8 & 0xFFFFFFFF);
+    /**
+     * @dev new Role style start from 1
+     */
+    function getStyle(uint256 slot_) public pure returns (uint8) {
+        return uint8((slot_ >> 40) & 0xFF);
     }
 
     /**
-     * @dev Add exp then generate new slot, then reach levelNeedAwakening will stuck
-     * @param slot_ Slot
-     * @param exp_ Exp
-     * @return newSlot New slot
-     * @return overflowExp Overflow exp
+     * @dev uint32 for future use
      */
-    function addExp(uint256 slot_, uint32 exp_) public view returns (uint256, uint32) {
-        uint8 level = getLevel(slot_);
-        uint32 exp = getExp(slot_);
-        uint32 newExp = exp + exp_;
-        uint8 newLevel = level;
-        uint32 overflowExp = 0;
-
-        while (newExp >= expTable[newLevel - 1]) {
-            newExp -= expTable[newLevel - 1];
-            overflowExp = newExp;
-            newLevel++;
-
-            for (uint256 i = 0; i < levelNeedAwakening.length; i++) {
-                if (levelNeedAwakening[i] == newLevel) {
-                    uint8 oldLevel = newLevel - 1;
-                    uint32 needLevelExp = expTable[oldLevel - 1];
-                    overflowExp = newExp;
-                    return (
-                        generateSlot(getRoleId(slot_), getRarity(slot_), getVariant(slot_), oldLevel, needLevelExp),
-                        overflowExp
-                    );
-                }
-            }
-        }
-        return (generateSlot(getRoleId(slot_), getRarity(slot_), getVariant(slot_), newLevel, newExp), 0);
+    function getReserved(uint256 slot_) public pure returns (uint32) {
+        return uint32(slot_ >> 8 & 0xFFFFFFFF);
     }
 
     function isActivePool(address pool_) external view returns (bool) {
@@ -240,20 +206,6 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     function getImplementation() external view returns (address) {
         return _getImplementation();
-    }
-
-    function _beforeValueTransfer(
-        address from_,
-        address to_,
-        uint256 fromTokenId_,
-        uint256 toTokenId_,
-        uint256 slot_,
-        uint256 value_
-    ) internal virtual override {
-        super._beforeValueTransfer(from_, to_, fromTokenId_, toTokenId_, slot_, value_);
-        if (getLevel(slot_) < 60 && from_ != address(0) && to_ != address(0)) {
-            revert Soulbound();
-        }
     }
 
     /**

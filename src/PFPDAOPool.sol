@@ -142,14 +142,14 @@ contract PFPDAOPool is
             equipmentNFT.mint(_msgSender(), tmpSlot, 1);
             // console2.log("[loot1] equipment slot: %s, balance: %s", tmpSlot, 1);
         } else {
-            roleNFT.mint(_msgSender(), tmpSlot, 1);
+            roleNFT.mint(_msgSender(), tmpSlot);
             // console2.log("[loot1] role slot: %s, balance: %s", tmpSlot, 1);
         }
 
         emit LootResult(_msgSender(), tmpSlot, 1);
         emit GuarResult(
             _msgSender(), mintTimesForUpSS[_msgSender()], mintTimesForSSS[_msgSender()], nextIsUpSSS[_msgSender()]
-            );
+        );
     }
 
     function loot1() external payable loot1PayVerify {
@@ -191,15 +191,16 @@ contract PFPDAOPool is
                 equipmentNFT.mint(_msgSender(), tmpSlot, tmpBalance);
                 // console2.log("[loot10] equipment slot: %s, balance: %s", tmpSlot, tmpBalance);
             } else {
-                roleNFT.mint(_msgSender(), tmpSlot, tmpBalance);
-                // console2.log("[loot10] role slot: %s, balance: %s", tmpSlot, tmpBalance);
+                for (uint8 j = 0; j < tmpBalance; j++) {
+                    roleNFT.mint(_msgSender(), tmpSlot);
+                }
             }
             emit LootResult(_msgSender(), tmpSlot, tmpBalance);
         }
 
         emit GuarResult(
             _msgSender(), mintTimesForUpSS[_msgSender()], mintTimesForSSS[_msgSender()], nextIsUpSSS[_msgSender()]
-            );
+        );
     }
 
     function loot10() external payable loot10PayVerify {
@@ -294,7 +295,7 @@ contract PFPDAOPool is
         } else {
             variant = getRoleVariant(_msgSender(), roleId);
         }
-        uint256 newSlot = roleNFT.generateSlot(roleId, rarity, variant, 1, 0);
+        uint256 newSlot = roleNFT.generateSlot(roleId, rarity, variant, 1);
         return newSlot;
     }
 
