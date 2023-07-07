@@ -12,8 +12,14 @@ contract InitPFPDAO is Script {
     PFPDAORole wrappedRoleA;
     PFPDAOEquipment wrappedEquip;
 
-    function initAll(address pool_, address role_, address equip_, address admin_) public {
-        vm.startPrank(admin_);
+    function run() public {
+        address pool_ = vm.envAddress("POOL_ADDRESS");
+        address role_ = vm.envAddress("ROLEA_ADDRESS");
+        address equip_ = vm.envAddress("EQUIP_ADDRESS");
+        uint256 privKey = vm.envUint("PRIVATE_KEY");
+        address admin_ = vm.rememberKey(privKey);
+
+        vm.startBroadcast(admin_);
         wrappedPool = PFPDAOPool(pool_);
         wrappedRoleA = PFPDAORole(role_);
         wrappedEquip = PFPDAOEquipment(equip_);
@@ -24,14 +30,23 @@ contract InitPFPDAO is Script {
         initTreasury(wrappedPool);
         initRoleName(wrappedRoleA);
         initRole(wrappedRoleA, address(wrappedPool), address(wrappedEquip));
+        initPool();
+        vm.stopBroadcast();
     }
 
-    function initNonce(PFPDAOPool pool_) public {
+    function initPool() private {
+        wrappedRoleA.addActivePool(address(wrappedPool));
+        wrappedEquip.addActivePool(address(wrappedPool));
+        require(wrappedRoleA.isActivePool(address(wrappedPool)));
+        require(wrappedEquip.isActivePool(address(wrappedPool)));
+    }
+
+    function initNonce(PFPDAOPool pool_) private {
         pool_.setActiveNonce(1);
-        assert(pool_.activeNonce() == 1);
+        require(pool_.activeNonce() == 1);
     }
 
-    function initRole(PFPDAOPool pool_) public {
+    function initRole(PFPDAOPool pool_) private {
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
         uint16 upLegendaryId = 1;
         uint16[] memory upRareIds = new uint16[](3);
@@ -48,41 +63,41 @@ contract InitPFPDAO is Script {
         pool_.setNormalRareIds(normalRareIds);
         pool_.setNormalCommonIds(normalCommonIds);
 
-        assert(pool_.upLegendaryId() == 1);
-        assert(pool_.getUpRareIdsLength() == 3);
-        assert(pool_.getNormalLegendaryIdsLength() == 0);
-        assert(pool_.getNormalRareIdsLength() == 0);
-        assert(pool_.getNormalCommonIdsLength() == 1);
+        require(pool_.upLegendaryId() == 1);
+        require(pool_.getUpRareIdsLength() == 3);
+        require(pool_.getNormalLegendaryIdsLength() == 0);
+        require(pool_.getNormalRareIdsLength() == 0);
+        require(pool_.getNormalCommonIdsLength() == 1);
     }
 
-    function initPrice(PFPDAOPool pool_) public {
+    function initPrice(PFPDAOPool pool_) private {
         pool_.setPriceLootOne(vm.envInt("PRICE_ONE"));
         pool_.setPriceLootTen(vm.envInt("PRICE_TEN"));
-        assert(pool_.priceLootOne() == vm.envInt("PRICE_ONE"));
-        assert(pool_.priceLootTen() == vm.envInt("PRICE_TEN"));
+        require(pool_.priceLootOne() == vm.envInt("PRICE_ONE"));
+        require(pool_.priceLootTen() == vm.envInt("PRICE_TEN"));
     }
 
-    function initSigner(PFPDAOPool pool_) public {
+    function initSigner(PFPDAOPool pool_) private {
         pool_.setSigner(vm.envAddress("SIGNER"));
-        assert(pool_.signer() == vm.envAddress("SIGNER"));
+        require(pool_.signer() == vm.envAddress("SIGNER"));
     }
 
-    function initTreasury(PFPDAOPool pool_) public {
+    function initTreasury(PFPDAOPool pool_) private {
         pool_.setTreasury(vm.envAddress("TREASURY"));
-        assert(pool_.treasury() == vm.envAddress("TREASURY"));
+        require(pool_.treasury() == vm.envAddress("TREASURY"));
     }
 
-    function initRoleName(PFPDAORole role_) public {
+    function initRoleName(PFPDAORole role_) private {
         role_.setRoleName(1, "Linger");
         role_.setRoleName(2, "Kazuki");
         role_.setRoleName(3, "Mila");
         role_.setRoleName(4, "Mico");
     }
 
-    function initRole(PFPDAORole role_, address pool_, address equip_) public {
+    function initRole(PFPDAORole role_, address pool_, address equip_) private {
         role_.addActivePool(pool_);
-        assert(role_.isActivePool(pool_));
+        require(role_.isActivePool(pool_));
         role_.setEquipmentContract(equip_);
-        assert(role_.equipmentContract() == address(equip_));
+        require(role_.equipmentContract() == address(equip_));
     }
 }

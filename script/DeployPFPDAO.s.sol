@@ -56,9 +56,6 @@ contract Deploy is Script {
         address equipAddress = address(wrappedEquipV1);
         address roleAAddress = address(wrappedRoleAV1);
 
-        InitPFPDAO initPFPDAOContract = new InitPFPDAO();
-        initPFPDAOContract.initAll(poolAddress, roleAAddress, equipAddress, deployer);
-
         console2.log("Pool address: %s", poolAddress);
         console2.log("Equip address: %s", equipAddress);
         console2.log("RoleA address: %s", roleAAddress);

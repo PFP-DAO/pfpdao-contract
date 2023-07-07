@@ -136,22 +136,6 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
         return _levelUp(nftId_, totalExp);
     }
 
-    function computeStyle(uint8 level_) public pure returns (uint8) {
-        if (level_ < 20) {
-            return 0;
-        } else if (level_ < 40) {
-            return 1;
-        } else if (level_ < 60) {
-            return 2;
-        } else if (level_ < 80) {
-            return 3;
-        } else if (level_ < 90) {
-            return 4;
-        } else {
-            return 5;
-        }
-    }
-
     function reachLimitLevel(uint256 nftId_) public view returns (bool) {
         uint32[] memory levels = new uint32[](5);
         levels[0] = 20 - 1;
@@ -225,15 +209,16 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
         _requireMinted(tokenId_);
         uint256 slot = slotOf(tokenId_);
         uint16 roleId = getRoleId(slot);
+        string memory roleIdStr = roleId.toString();
         string memory styleStr = (getStyle(slot) - 1).toString();
         return string(
             abi.encodePacked(
                 "https://pfpdao-0.4everland.store/metadata/",
-                roleId.toString(),
+                roleIdStr,
                 "/V1_",
                 styleStr,
                 "/role_",
-                roleId.toString(),
+                roleIdStr,
                 "_V1_",
                 styleStr,
                 "_",
