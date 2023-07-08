@@ -16,6 +16,15 @@ contract PFPDAOEquipment is PFPDAO {
         return _mint(to_, slot_, balance_);
     }
 
+    function _setMetadataDescriptor(address metadataDescriptor_) internal override {
+        metadataDescriptor = IERC3525MetadataDescriptorUpgradeable(metadataDescriptor_);
+        emit SetMetadataDescriptor(metadataDescriptor_);
+    }
+
+    function setMetadataDescriptor(address metadataDescriptor_) external onlyOwner {
+        _setMetadataDescriptor(metadataDescriptor_);
+    }
+
     function _beforeValueTransfer(
         address from_,
         address to_,

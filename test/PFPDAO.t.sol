@@ -6,6 +6,7 @@ import "forge-std/console2.sol";
 
 import {PFPDAOEquipment, NotBurner} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool} from "../src/PFPDAOPool.sol";
+import {PFPDAOEquipMetadataDescriptor} from "../src/PFPDAOEquipMetadataDescriptor.sol";
 import {PFPDAORole, Soulbound, InvalidSlot, NotAllowed, NotOwner} from "../src/PFPDAORole.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
@@ -15,16 +16,19 @@ contract _PFPDAOTest is PRBTest {
     PFPDAOEquipment implementationEquipV1;
     PFPDAORole implementationRoleAV1;
     PFPDAORole implementationRoleBV1;
+    PFPDAOEquipMetadataDescriptor implementationMetadataDescriptor;
 
     UUPSProxy proxyPool;
     UUPSProxy proxyEquip;
     UUPSProxy proxyRoleA;
     UUPSProxy proxyRoleB;
+    UUPSProxy proxyMetadataDescriptor;
 
     PFPDAOPool wrappedPoolV1;
     PFPDAOEquipment wrappedEquipV1;
     PFPDAORole wrappedRoleAV1;
     PFPDAORole wrappedRoleBV1;
+    PFPDAOEquipMetadataDescriptor wrappedMetadataDescriptor;
 
     address signer;
     uint256 signerPrivateKey = 0xabcdf1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
@@ -40,18 +44,21 @@ contract _PFPDAOTest is PRBTest {
         implementationEquipV1 = new PFPDAOEquipment();
         implementationRoleAV1 = new PFPDAORole();
         implementationRoleBV1 = new PFPDAORole();
+        implementationMetadataDescriptor = new PFPDAOEquipMetadataDescriptor();
 
         // 部署代理合约并将其指向实现合约，这个是ERC1967Proxy
         proxyPool = new UUPSProxy(address(implementationPoolV1), "");
         proxyEquip = new UUPSProxy(address(implementationEquipV1), "");
         proxyRoleA = new UUPSProxy(address(implementationRoleAV1), "");
         proxyRoleB = new UUPSProxy(address(implementationRoleBV1), "");
+        proxyMetadataDescriptor = new UUPSProxy(address(implementationMetadataDescriptor), "");
 
         // 将代理合约包装成ABI，以支持更容易的调用
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
         wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
+        wrappedMetadataDescriptor = PFPDAOEquipMetadataDescriptor(address(proxyMetadataDescriptor));
 
         // 初始化合约
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
@@ -87,6 +94,8 @@ contract _PFPDAOTest is PRBTest {
         wrappedPoolV1.setSigner(signer);
 
         wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
+
+        wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);
@@ -426,5 +435,16 @@ contract _PFPDAOTest is PRBTest {
         vm.expectRevert("ERC3525: invalid token ID");
         wrappedRoleAV1.balanceOf(2); // nft 2 should be burned
         assertEq(wrappedRoleAV1.balanceOf(user1), 1); // user1 has 1 nft now
+    }
+
+    function testEquipUri() public {
+        _loot10GetARole();
+
+        string memory equipUri = wrappedEquipV1.tokenURI(1);
+        console2.log("equipUri: %s", equipUri);
+        assertEq(
+            equipUri,
+            "data:application/json;base64,eyJuYW1lIjoiVGhlIFBvd2VyIG9mIENoYW9zICMxIiwiZGVzY3JpcHRpb24iOiJQRlBEQU8gZXF1aXBtZW50LCBhZGQgZXhwZXJpZW5jZSBwb2ludHMgdG8gYW55IHJvbGUgd2hlbiBidXJuZWQuIiwiaW1hZ2UiOiJodHRwczovL3BmcGRhby0wLjRldmVybGFuZC5zdG9yZS9lcXVpcG1lbnQvYXZhdGFyLWVxdWlwLmpwZyIsImJhbGFuY2UiOiI5Iiwic2xvdCI6IjEwOTk1MTE2Mjc3NzYiLCJwcm9wZXJ0aWVzIjp7fX0="
+        );
     }
 }
