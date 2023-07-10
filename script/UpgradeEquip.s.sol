@@ -16,9 +16,13 @@ contract UpgradeEquip is Script {
         vm.startBroadcast(deployer);
 
         PFPDAOEquipment wrappedEquipV1 = PFPDAOEquipment(equip);
-        PFPDAOEquipment implementationV2 = new PFPDAOEquipment();
-        wrappedEquipV1.upgradeTo(address(implementationV2));
-        wrappedEquipV1.setMetadataDescriptor(metadata);
+        // PFPDAOEquipment implementationV2 = new PFPDAOEquipment();
+        // wrappedEquipV1.upgradeTo(address(implementationV2));
+        // wrappedEquipV1.setMetadataDescriptor(metadata);
+
+        address[] memory allowedBurners = new address[](1);
+        allowedBurners[0] = address(vm.envAddress("ROLEA_ADDRESS"));
+        wrappedEquipV1.updateAllowedBurners(allowedBurners);
 
         vm.stopBroadcast();
     }

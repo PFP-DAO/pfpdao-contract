@@ -31,6 +31,7 @@ contract InitPFPDAO is Script {
         initRoleName(wrappedRoleA);
         initRole(wrappedRoleA, address(wrappedPool), address(wrappedEquip));
         initPool();
+        initEquip(wrappedRoleA, wrappedEquip);
         vm.stopBroadcast();
     }
 
@@ -99,5 +100,11 @@ contract InitPFPDAO is Script {
         require(role_.isActivePool(pool_));
         role_.setEquipmentContract(equip_);
         require(role_.equipmentContract() == address(equip_));
+    }
+
+    function initEquip(PFPDAORole role_, PFPDAOEquipment equip_) private {
+        address[] memory allowedBurners = new address[](1);
+        allowedBurners[0] = address(role_);
+        equip_.updateAllowedBurners(allowedBurners);
     }
 }
