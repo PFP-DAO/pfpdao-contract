@@ -9,27 +9,22 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/SignatureCheckerUpgradeable.sol";
 
 import {PFPDAO} from "./PFPDAO.sol";
-import {PFPDAORoleVariantManager} from "./PFPDAORoleVariantManager.sol";
+import {IPFPDAOStyleVariantManager} from "./IPFPDAOStyleVariantManager.sol";
 import {PFPDAOEquipment} from "./PFPDAOEquipment.sol";
 import {PFPDAORole} from "./PFPDAORole.sol";
-
-// import "@chainlink/interfaces/AggregatorV3Interface.sol";
-
-// import "forge-std/console2.sol";
 
 error InvalidSignature();
 error WhiteListUsed(uint8);
 error InvaildLootTimes();
 
-contract PFPDAOPool is
-    Initializable,
-    ContextUpgradeable,
-    OwnableUpgradeable,
-    UUPSUpgradeable,
-    PFPDAORoleVariantManager
-{
+contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
     using ECDSAUpgradeable for bytes32;
     using SignatureCheckerUpgradeable for address;
+
+    // Replacing original variables from PFPDAORoleVariantManager with a storage gap of 52 slots
+    uint256[51] private ___gap;
+
+    IPFPDAOStyleVariantManager private styleVariantManager;
 
     int256 public priceLootOne;
     int256 public priceLootTen;
@@ -37,9 +32,6 @@ contract PFPDAOPool is
     mapping(address => uint8) public mintTimesForUpSS;
     mapping(address => uint8) public mintTimesForSSS;
     mapping(address => bool) public nextIsUpSSS;
-
-    // AggregatorV3Interface internal _priceFeed;
-    // address public oldAddressSlot;
 
     // When deploying the pool, the equipment address and the character NFT address should be specified.
     PFPDAOEquipment public equipmentNFT;
@@ -66,17 +58,9 @@ contract PFPDAOPool is
     event LootResult(address indexed user, uint256 slot, uint8 balance);
     event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
 
-    // event SupportResult(address indexed user, uint16 indexed captainId, uint256 value);
-
-    // function __PFPDAOPool_init() internal onlyInitializing {
-    //     __PFPDAOPool_init_unchained();
+    // constructor() {
+    //     _disableInitializers();
     // }
-
-    // function __PFPDAOPool_init_unchained() internal onlyInitializing {}
-
-    constructor() {
-        _disableInitializers();
-    }
 
     function initialize(address equipmentAddress_, address roleNFTAddress_) public initializer {
         __Ownable_init();
@@ -86,11 +70,6 @@ contract PFPDAOPool is
 
         _defaultRoleIdForNewUser = 1;
 
-        // https://docs.chain.link/data-feeds/price-feeds/addresses/?network=polygon
-        // mainnet 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
-        // _priceFeed = AggregatorV3Interface(0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada);
-        // priceLootOne = 2.8e8; // 2.8 U
-        // priceLootTen = 22e8; // 22 U
         priceLootOne = 2.8e18;
         priceLootTen = 22e18;
     }
@@ -110,8 +89,6 @@ contract PFPDAOPool is
     }
 
     function getLatestPrice() public pure returns (int256) {
-        // (, int256 price,,,) = _priceFeed.latestRoundData();
-        // return price;
         return 10000000; // price 100000000 == 1 U for mock
     }
 
@@ -293,7 +270,7 @@ contract PFPDAOPool is
         if (rarity == 0) {
             variant = 0;
         } else {
-            variant = getRoleVariant(_msgSender(), roleId);
+            variant = styleVariantManager.getRoleAwakenVariant(_msgSender(), roleId, 1);
         }
         uint256 newSlot = roleNFT.generateSlot(roleId, rarity, variant, 1);
         return newSlot;
@@ -383,16 +360,16 @@ contract PFPDAOPool is
         priceLootTen = price_;
     }
 
+    function setStyleVariantManager(address variantManager_) external onlyOwner {
+        styleVariantManager = IPFPDAOStyleVariantManager(variantManager_);
+    }
+
     function getRoleIdPoolBalance(uint16 roleId_) external view returns (uint256) {
         return roleIdPoolBalance[roleId_ - 1];
     }
 
     /* upgradeable functions */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    function getImplementation() external view returns (address) {
-        return _getImplementation();
-    }
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

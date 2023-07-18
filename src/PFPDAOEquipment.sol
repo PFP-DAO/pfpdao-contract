@@ -24,18 +24,4 @@ contract PFPDAOEquipment is PFPDAO {
     function setMetadataDescriptor(address metadataDescriptor_) external onlyOwner {
         _setMetadataDescriptor(metadataDescriptor_);
     }
-
-    function _beforeValueTransfer(
-        address from_,
-        address to_,
-        uint256 fromTokenId_,
-        uint256 toTokenId_,
-        uint256 slot_,
-        uint256 value_
-    ) internal virtual override {
-        super._beforeValueTransfer(from_, to_, fromTokenId_, toTokenId_, slot_, value_);
-        if (from_ != address(0) && to_ != address(0)) {
-            revert Soulbound();
-        }
-    }
 }

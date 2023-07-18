@@ -2,17 +2,19 @@
 pragma solidity ^0.8.0;
 
 import "./PFPDAO.sol";
-import {PFPDAORoleVariantManager} from "./PFPDAORoleVariantManager.sol";
+import {IPFPDAOStyleVariantManager} from "./IPFPDAOStyleVariantManager.sol";
 
 error InvalidSlot();
 error NotAllowed();
 error NotOwner();
 
-contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
+contract PFPDAORole is PFPDAO {
     using StringsUpgradeable for uint256;
     using StringsUpgradeable for uint32;
     using StringsUpgradeable for uint16;
     using StringsUpgradeable for uint8;
+
+    IPFPDAOStyleVariantManager private styleVariantManager;
 
     mapping(uint16 => string) public roldIdToName;
 
@@ -28,30 +30,19 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
     event LevelResult(uint256 indexed nftId, uint8 newLevel, uint32 newExp);
     event AwakeResult(uint256 indexed nftId, uint32 oldVariant, uint32 newVariant, uint8 newStyle);
 
-    constructor() {
-        _disableInitializers();
-    }
-
     function initialize(string calldata name_, string calldata symbol_) public initializer {
         __PFPDAO_init(name_, symbol_);
     }
 
-    function airdrop(address[] calldata to_, uint16 roldId_, uint8 rarity_, uint8 style_) public onlyOwner {
-        if (style_ >= 4 || rarity_ == 0 || rarity_ > 2 || bytes(roldIdToName[roldId_]).length == 0) {
-            revert InvalidSlot();
-        }
-
+    function airdrop(address[] calldata to_, uint16 roldId_, uint8 rarity_) public onlyOwner {
         for (uint256 i = 0; i < to_.length; i++) {
-            uint32 variant =
-                rarity_ == 1 ? getRoleVariant(to_[i], roldId_) : getRoleAwakenVariant(to_[i], roldId_, style_);
-
-            uint256 newSlot = generateSlot(roldId_, rarity_, variant, style_);
+            uint32 variant = styleVariantManager.getRoleAwakenVariant(to_[i], roldId_, 1);
+            uint256 newSlot = generateSlot(roldId_, rarity_, variant, 1);
             _mint(to_[i], newSlot, 1);
         }
     }
 
     function mint(address to_, uint256 slot_) public {
-        // only active pool can mint
         if (!activePools[_msgSender()]) {
             revert NotAllowed();
         }
@@ -61,7 +52,7 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
     }
 
     function getLevel(uint256 nftId_) public view returns (uint8) {
-        return exps[nftId_].level;
+        return exps[nftId_].level == 0 ? 1 : exps[nftId_].level;
     }
 
     function _setLevel(uint256 nftId_, uint8 newLevel_) private {
@@ -76,9 +67,9 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
         exps[nftId_].exp = newExp_;
     }
 
-    function _addExp(uint256 nftid_, uint32 exp_) private view returns (uint8, uint32, uint32) {
-        uint8 oldLevel = getLevel(nftid_);
-        uint32 oldExp = getExp(nftid_);
+    function _addExp(uint256 nftId_, uint32 exp_) private view returns (uint8, uint32, uint32) {
+        uint8 oldLevel = getLevel(nftId_);
+        uint32 oldExp = getExp(nftId_);
         uint32 newExp = oldExp + exp_;
         uint8 newLevel = oldLevel;
         uint32 overflowExp = 0;
@@ -137,36 +128,41 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
     }
 
     function reachLimitLevel(uint256 nftId_) public view returns (bool) {
-        uint32[] memory levels = new uint32[](5);
-        levels[0] = 20 - 1;
-        levels[1] = 40 - 1;
-        levels[2] = 60 - 1;
-        levels[3] = 80 - 1;
-        levels[4] = 90 - 1;
         uint32 level = getLevel(nftId_);
         uint32 exp = getExp(nftId_);
-        for (uint256 i = 0; i < levels.length; i++) {
-            if (level == levels[i] && exp == expTable[levels[i] - 1]) {
-                return true;
-            }
-        }
+
+        if (level == 19 && exp == expTable[18]) return true;
+        if (level == 39 && exp == expTable[38]) return true;
+        if (level == 59 && exp == expTable[58]) return true;
+        if (level == 79 && exp == expTable[78]) return true;
+        if (level == 89 && exp == expTable[88]) return true;
+
         return false;
     }
 
     function generateSlotWhenAwake(uint256 oldSlot_, uint32 newVariant_) public pure returns (uint256) {
         uint8 oldStyle = getStyle(oldSlot_);
         uint256 slot = oldSlot_;
-        slot = (slot & ~(uint256(0xFFFFFFFF) << 48)) | (uint256(newVariant_) << 48); // cover old variant
-        slot = (slot & ~(uint256(0xFF) << 40)) | (uint256(oldStyle + 1) << 40); // replace old style to style+1
-        slot |= uint256(getVariant(oldSlot_)) << 88 + 32 * oldStyle; // save history variant
+
+        uint256 VARIANT_MASK = uint256(0xFFFFFFFF) << 48;
+        uint256 VARIANT_SHIFT = 48;
+        uint256 STYLE_MASK = uint256(0xFF) << 40;
+        uint256 STYLE_SHIFT = 40;
+        uint256 VARIANT_OLDSTYLE_SHIFT = 88 + 32 * oldStyle;
+
+        slot = (slot & ~VARIANT_MASK) | (uint256(newVariant_) << VARIANT_SHIFT);
+        slot = (slot & ~STYLE_MASK) | (uint256(oldStyle + 1) << STYLE_SHIFT);
+        slot |= uint256(getVariant(oldSlot_)) << VARIANT_OLDSTYLE_SHIFT;
+
         return slot;
     }
 
     function getVariants(uint256 slot_) public pure returns (uint32[] memory) {
         uint8 style = getStyle(slot_);
-        uint32[] memory variants = new uint32[](style - 1);
+        uint256 variantCount = style - 1;
+        uint32[] memory variants = new uint32[](variantCount);
 
-        for (uint256 i = 0; i < style - 1; i++) {
+        for (uint256 i = 0; i < variantCount; i++) {
             uint32 newVariant = uint32(slot_ >> (88 + 32 * (i + 1)) & 0xFFFFFFFF);
             variants[i] = newVariant;
         }
@@ -182,16 +178,18 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
         }
 
         uint8 nftMainStyle = getStyle(nftMainSlot);
+        uint8 nftBurnStyle = getStyle(nftBurnSlot);
+        uint16 mainRoleId = getRoleId(nftMainSlot);
+        uint16 burnRoleId = getRoleId(nftBurnSlot);
 
-        if (nftMainStyle != getStyle(nftBurnSlot) || getRoleId(nftMainSlot) != getRoleId(nftBurnSlot)) {
+        if (nftMainStyle != nftBurnStyle || mainRoleId != burnRoleId) {
             revert InvalidSlot();
         }
 
-        uint16 roldId = getRoleId(nftMainSlot);
         uint32 oldVariant = getVariant(nftMainSlot);
-        uint32 newVariant = getRoleAwakenVariant(_msgSender(), roldId, nftMainStyle + 1);
+        uint32 newVariant = styleVariantManager.getRoleAwakenVariant(_msgSender(), mainRoleId, nftMainStyle + 1);
 
-        uint8 newStyle = getStyle(nftMainSlot) + 1;
+        uint8 newStyle = nftMainStyle + 1;
         uint256 newSlot = generateSlotWhenAwake(nftMainSlot, newVariant);
 
         _burn(nftId_);
@@ -238,14 +236,8 @@ contract PFPDAORole is PFPDAO, PFPDAORoleVariantManager {
         equipmentContract = equipmentContract_;
     }
 
-    function addRoleExp(uint256 nftId_, uint32 exp_) public onlyOwner returns (uint8, uint32, uint32) {
-        return _levelUp(nftId_, exp_);
-    }
-
-    function setRoleExp(uint256 nftId_, uint8 level_, uint32 exp_) public onlyOwner {
-        require(exps[nftId_].level != 0, "exps[nftId_].level is 0");
-        exps[nftId_].level = level_;
-        exps[nftId_].exp = exp_;
+    function setStyleVariantManager(address variantManager_) public onlyOwner {
+        styleVariantManager = IPFPDAOStyleVariantManager(variantManager_);
     }
 
     function _beforeValueTransfer(

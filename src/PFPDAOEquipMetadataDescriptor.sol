@@ -9,8 +9,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 contract PFPDAOEquipMetadataDescriptor is ERC3525MetadataDescriptorUpgradeable, UUPSUpgradeable, OwnableUpgradeable {
     using Strings for uint256;
 
-    constructor() payable initializer {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() public initializer {
         __ERC3525MetadataDescriptor_init();
+        __Ownable_init();
+        __UUPSUpgradeable_init();
     }
 
     function _tokenName(uint256 tokenId_) internal pure override returns (string memory) {
@@ -25,10 +31,11 @@ contract PFPDAOEquipMetadataDescriptor is ERC3525MetadataDescriptorUpgradeable, 
         return "https://pfpdao-0.4everland.store/equipment/avatar-equip.jpg";
     }
 
+    function _tokenProperties(uint256 tokenId_) internal view override returns (string memory) {
+        IERC3525MetadataUpgradeable erc3525 = IERC3525MetadataUpgradeable(msg.sender);
+        return string(abi.encodePacked("{", '"balance":', erc3525.balanceOf(tokenId_).toString(), "}"));
+    }
+
     /* upgrade functions */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    function getImplementation() external view returns (address) {
-        return _getImplementation();
-    }
 }

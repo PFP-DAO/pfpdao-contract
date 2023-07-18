@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/SignatureCheckerU
 import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool, WhiteListUsed, InvalidSignature} from "../src/PFPDAOPool.sol";
 import {PFPDAORole, Soulbound} from "../src/PFPDAORole.sol";
+import {PFPDAOStyleVariantManager} from "../src/PFPDAOStyleVariantManager.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 
@@ -23,17 +24,17 @@ contract _PFPDAOPoolTest is PRBTest {
     PFPDAOPool implementationPoolV1;
     PFPDAOEquipment implementationEquipV1;
     PFPDAORole implementationRoleAV1;
-    PFPDAORole implementationRoleBV1;
+    PFPDAOStyleVariantManager implementationStyleManagerV1;
 
     UUPSProxy proxyPool;
     UUPSProxy proxyEquip;
     UUPSProxy proxyRoleA;
-    UUPSProxy proxyRoleB;
+    UUPSProxy proxyStyleManager;
 
     PFPDAOPool wrappedPoolV1;
     PFPDAOEquipment wrappedEquipV1;
     PFPDAORole wrappedRoleAV1;
-    PFPDAORole wrappedRoleBV1;
+    PFPDAOStyleVariantManager wrappedStyleManagerV1;
 
     address signer;
     uint256 signerPrivateKey = 0xabcdf1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
@@ -47,25 +48,27 @@ contract _PFPDAOPoolTest is PRBTest {
         implementationPoolV1 = new PFPDAOPool();
         implementationEquipV1 = new PFPDAOEquipment();
         implementationRoleAV1 = new PFPDAORole();
-        implementationRoleBV1 = new PFPDAORole();
+        implementationStyleManagerV1 = new PFPDAOStyleVariantManager();
 
         // 部署代理合约并将其指向实现合约，这个是ERC1967Proxy
         proxyPool = new UUPSProxy(address(implementationPoolV1), "");
         proxyEquip = new UUPSProxy(address(implementationEquipV1), "");
         proxyRoleA = new UUPSProxy(address(implementationRoleAV1), "");
-        proxyRoleB = new UUPSProxy(address(implementationRoleBV1), "");
+        proxyStyleManager = new UUPSProxy(address(implementationStyleManagerV1), "");
 
         // 将代理合约包装成ABI，以支持更容易的调用
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
-        wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
+        wrappedStyleManagerV1 = PFPDAOStyleVariantManager(address(proxyStyleManager));
 
         // 初始化合约
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
+        wrappedPoolV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedEquipV1.initialize();
         wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
-        wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
+        wrappedStyleManagerV1.initialize(address(wrappedPoolV1), address(wrappedRoleAV1));
+        wrappedRoleAV1.setStyleVariantManager(address(proxyStyleManager));
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
         uint16 upLegendaryId = 1;
@@ -97,6 +100,7 @@ contract _PFPDAOPoolTest is PRBTest {
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);
+        vm.deal(user2, 100 ether);
 
         // warp to 3 is bad lucky
         vm.warp(3);
@@ -355,5 +359,38 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.loot10{value: 22 ether}();
         wrappedPoolV1.withdraw();
         assertEq(address(treasury).balance, 22 ether);
+    }
+
+    function testStyleVariantManager() public {
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}();
+
+        assertEq(wrappedStyleManagerV1.viewLastVariant(2, 1), 1);
+
+        assertEq(wrappedRoleAV1.tokenURI(1), wrappedRoleAV1.tokenURI(2));
+        assertEq(wrappedRoleAV1.tokenURI(2), wrappedRoleAV1.tokenURI(3));
+        assertEq(wrappedRoleAV1.tokenURI(3), wrappedRoleAV1.tokenURI(4));
+        assertEq(
+            keccak256(abi.encode("https://pfpdao-0.4everland.store/metadata/2/V1_0/role_2_V1_0_1_Kazuki.json")),
+            keccak256(abi.encode(wrappedRoleAV1.tokenURI(4)))
+        );
+
+        assertEq(4, wrappedRoleAV1.balanceOf(user1));
+
+        vm.warp(10);
+        vm.startPrank(user2);
+        wrappedPoolV1.loot10{value: 22 ether}();
+        assertEq(
+            keccak256(abi.encode("https://pfpdao-0.4everland.store/metadata/2/V1_0/role_2_V1_0_2_Kazuki.json")),
+            keccak256(abi.encode(wrappedRoleAV1.tokenURI(5)))
+        );
+
+        assertEq(wrappedStyleManagerV1.viewLastVariant(2, 1), 2);
+        assertEq(wrappedStyleManagerV1.viewRoleAwakenVariant(user1, 2, 1), 1);
+        assertEq(wrappedStyleManagerV1.viewRoleAwakenVariant(user2, 2, 1), 2);
+        assertEq(wrappedStyleManagerV1.viewRoleAwakenVariant(treasury, 2, 1), 0);
     }
 }

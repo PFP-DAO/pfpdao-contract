@@ -28,7 +28,7 @@ contract UpgradeRole is Script {
         assert(keccak256(abi.encodePacked((wrappedRoleV1.roldIdToName(2)))) == keccak256(abi.encodePacked(("Kazuki"))));
         assert(keccak256(abi.encodePacked((wrappedRoleV1.roldIdToName(3)))) == keccak256(abi.encodePacked(("Mila"))));
         assert(keccak256(abi.encodePacked((wrappedRoleV1.roldIdToName(4)))) == keccak256(abi.encodePacked(("Mico"))));
-
+        assert(wrappedRoleV1.equipmentContract() == vm.envAddress("EQUIP_ADDRESS"));
         vm.stopBroadcast();
     }
 }
