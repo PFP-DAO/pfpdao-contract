@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
@@ -12,6 +12,7 @@ import {PFPDAO} from "./PFPDAO.sol";
 import {IPFPDAOStyleVariantManager} from "./IPFPDAOStyleVariantManager.sol";
 import {PFPDAOEquipment} from "./PFPDAOEquipment.sol";
 import {PFPDAORole} from "./PFPDAORole.sol";
+import {IDividend} from "./IDividend.sol";
 
 error InvalidSignature();
 error WhiteListUsed(uint8);
@@ -22,8 +23,9 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     using SignatureCheckerUpgradeable for address;
 
     // Replacing original variables from PFPDAORoleVariantManager with a storage gap of 52 slots
-    uint256[51] private ___gap;
+    uint256[50] private ___gap;
 
+    IDividend public dividend;
     IPFPDAOStyleVariantManager private styleVariantManager;
 
     int256 public priceLootOne;
@@ -37,12 +39,12 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     PFPDAOEquipment public equipmentNFT;
     PFPDAORole public roleNFT;
 
-    uint16 public upLegendaryId;
-    uint16[] public oldArraySlot;
-    uint16[] public upRareIds;
-    uint16[] public normalLegendaryIds;
-    uint16[] public normalRareIds;
-    uint16[] public normalCommonIds;
+    uint16 public upSSSId;
+    uint16[] private __unusedArray;
+    uint16[] public upSSIds;
+    uint16[] public nSSSIds;
+    uint16[] public nSSIds;
+    uint16[] public nSIds;
 
     // 50% of the funds go into the pool associated with the character.
     mapping(uint16 => uint256) public roleIdPoolBalance;
@@ -130,12 +132,11 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     }
 
     function loot1() external payable loot1PayVerify {
-        roleIdPoolBalance[_defaultRoleIdForNewUser] += msg.value / 2;
         _loot1();
     }
 
     function loot1(uint16 captainId_, uint256 nftId_) external payable loot1PayVerify {
-        roleIdPoolBalance[captainId_] += msg.value / 2;
+        dividend.claim(_msgSender(), captainId_);
         _loot1();
         roleNFT.levelUpWhenLoot(nftId_, 2);
     }
@@ -160,17 +161,14 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
             }
         }
 
-        for (uint8 i = 0; i < balance.length; i++) {
+        for (uint256 i = 0; i < balance.length; i++) {
             if (balance[i] == 0) continue;
             uint256 tmpSlot = slots[i];
             uint8 tmpBalance = balance[i];
             if (roleNFT.getRarity(slots[i]) == 0) {
                 equipmentNFT.mint(_msgSender(), tmpSlot, tmpBalance);
-                // console2.log("[loot10] equipment slot: %s, balance: %s", tmpSlot, tmpBalance);
             } else {
-                for (uint8 j = 0; j < tmpBalance; j++) {
-                    roleNFT.mint(_msgSender(), tmpSlot);
-                }
+                roleNFT.mint(_msgSender(), tmpSlot);
             }
             emit LootResult(_msgSender(), tmpSlot, tmpBalance);
         }
@@ -181,12 +179,11 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     }
 
     function loot10() external payable loot10PayVerify {
-        roleIdPoolBalance[_defaultRoleIdForNewUser] += msg.value / 2;
         _lootN(10);
     }
 
     function loot10(uint16 captainId_, uint256 nftId_) external payable loot10PayVerify {
-        roleIdPoolBalance[captainId_] += msg.value / 2;
+        dividend.claim(_msgSender(), captainId_);
         _lootN(10);
         roleNFT.levelUpWhenLoot(nftId_, 20);
     }
@@ -196,133 +193,132 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     }
 
     function _mintLogic(uint8 time_) private returns (uint256) {
-        uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, time_)));
-        uint16 roleId;
-        uint8 rarity;
+        uint16 roleId = 0;
+        uint8 rarity = 0;
+        uint256 upSSCount = upSSIds.length;
+        uint256 cSSSCount = nSSSIds.length;
+        uint256 nSSCount = nSSIds.length;
 
+        uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, time_)));
         // Random number judgment. First check the legendary character guarantee, then the character guarantee, and finally the 10-draw guarantee.
         // 1. Legendary character guarantee: If a **Legendary** character is drawn and it is not the current up character, the next **Legendary** character drawn will definitely be the current up character.
         // 2. Character guarantee: Every 90 draws will definitely get a **Legendary** character.
         // 3. 10-draw guarantee: After 10 draws, there will definitely be a rare character. 3/4 of the time it will be the current up character, and 1/4 of the time it will be a permanent pool character.
 
-        if (nextIsUpSSS[_msgSender()]) {
-            // 角色大保底
-            roleId = upLegendaryId;
-            rarity = 2;
-            nextIsUpSSS[_msgSender()] = false;
-            mintTimesForSSS[_msgSender()] = 0;
-            mintTimesForUpSS[_msgSender()] += 1;
-        } else if (mintTimesForSSS[_msgSender()] == 89) {
-            // Role guarantee: Every 90 draws will definitely get a Legendary character.
-            if (normalLegendaryIds.length == 0) {
-                roleId = upLegendaryId;
-            } else if (seed % (normalLegendaryIds.length + 1) == 0) {
-                roleId = upLegendaryId;
-            } else {
-                roleId = normalLegendaryIds[seed % normalLegendaryIds.length];
-            }
-            rarity = 2;
-            mintTimesForSSS[_msgSender()] = 0;
-            mintTimesForUpSS[_msgSender()] += 1;
-        } else if (mintTimesForUpSS[_msgSender()] == 9) {
-            if (normalRareIds.length == 0) {
-                roleId = upRareIds[seed % upRareIds.length];
-            } else if (seed % 4 == 0) {
-                roleId = upRareIds[seed % upRareIds.length];
-            } else {
-                roleId = normalRareIds[seed % normalRareIds.length];
-            }
-            rarity = 1;
-            mintTimesForUpSS[_msgSender()] = 0;
-            mintTimesForSSS[_msgSender()] += 1;
-        } else {
-            // 1% Legendary, 10% Rare, 89% Common
-            uint8 randomValue = uint8(seed % 100);
-            if (randomValue < 1) {
-                if (normalLegendaryIds.length == 0) {
-                    roleId = upLegendaryId;
-                } else if (seed % (normalLegendaryIds.length + 1) == 0) {
-                    roleId = upLegendaryId;
+        unchecked {
+            if (nextIsUpSSS[_msgSender()]) {
+                // 角色大保底
+                roleId = upSSSId;
+                rarity = 2;
+                nextIsUpSSS[_msgSender()] = false;
+                mintTimesForSSS[_msgSender()] = 0;
+                mintTimesForUpSS[_msgSender()] += 1;
+            } else if (mintTimesForSSS[_msgSender()] == 89) {
+                // Role guarantee: Every 90 draws will definitely get a Legendary character.
+                if (cSSSCount == 0) {
+                    roleId = upSSSId;
+                } else if (seed % (cSSSCount + 1) == 0) {
+                    roleId = upSSSId;
                 } else {
-                    roleId = normalLegendaryIds[seed % normalLegendaryIds.length];
+                    roleId = nSSSIds[seed % cSSSCount];
                 }
                 rarity = 2;
                 mintTimesForSSS[_msgSender()] = 0;
                 mintTimesForUpSS[_msgSender()] += 1;
-            } else if (randomValue < 11) {
-                if (seed % (upRareIds.length + normalRareIds.length) <= upRareIds.length) {
-                    roleId = upRareIds[seed % upRareIds.length];
+            } else if (mintTimesForUpSS[_msgSender()] == 9) {
+                if (nSSCount == 0) {
+                    roleId = upSSIds[seed % upSSCount];
+                } else if (seed % 4 == 0) {
+                    roleId = upSSIds[seed % upSSCount];
                 } else {
-                    roleId = normalRareIds[seed % normalRareIds.length];
+                    roleId = nSSIds[seed % nSSCount];
                 }
                 rarity = 1;
-                mintTimesForSSS[_msgSender()] += 1;
                 mintTimesForUpSS[_msgSender()] = 0;
-            } else {
-                rarity = 0;
-                roleId = normalCommonIds[seed % normalCommonIds.length];
                 mintTimesForSSS[_msgSender()] += 1;
-                mintTimesForUpSS[_msgSender()] += 1;
+            } else {
+                // 1% Legendary, 10% Rare, 89% Common
+                uint8 randomValue = uint8(seed % 100);
+                if (randomValue < 1) {
+                    if (cSSSCount == 0) {
+                        roleId = upSSSId;
+                    } else if (seed % (cSSSCount + 1) == 0) {
+                        roleId = upSSSId;
+                    } else {
+                        roleId = nSSSIds[seed % cSSSCount];
+                    }
+                    rarity = 2;
+                    mintTimesForSSS[_msgSender()] = 0;
+                    mintTimesForUpSS[_msgSender()] += 1;
+                } else if (randomValue < 11) {
+                    if (seed % (upSSCount + nSSCount) <= upSSCount) {
+                        roleId = upSSIds[seed % upSSCount];
+                    } else {
+                        roleId = nSSIds[seed % nSSCount];
+                    }
+                    rarity = 1;
+                    mintTimesForSSS[_msgSender()] += 1;
+                    mintTimesForUpSS[_msgSender()] = 0;
+                } else {
+                    mintTimesForSSS[_msgSender()] += 1;
+                    mintTimesForUpSS[_msgSender()] += 1;
+                }
             }
         }
-
-        uint32 variant;
-        if (rarity == 0) {
-            variant = 0;
-        } else {
+        uint32 variant = 0;
+        if (rarity != 0) {
             variant = styleVariantManager.getRoleAwakenVariant(_msgSender(), roleId, 1);
         }
-        uint256 newSlot = roleNFT.generateSlot(roleId, rarity, variant, 1);
-        return newSlot;
+        return roleNFT.generateSlot(roleId, rarity, variant, 1);
     }
 
     /* admin functions */
-    function setUpLegendaryId(uint16 upLegendaryId_) external onlyOwner {
-        upLegendaryId = upLegendaryId_;
+    function setupSSSId(uint16 upSSSId_) external onlyOwner {
+        upSSSId = upSSSId_;
     }
 
-    function setUpRareIds(uint16[] memory upRareIds_) external onlyOwner {
-        upRareIds = new uint16[](upRareIds_.length);
-        for (uint256 i = 0; i < upRareIds_.length; i++) {
-            upRareIds[i] = upRareIds_[i];
+    function setupSSIds(uint16[] memory upSSIds_) external onlyOwner {
+        upSSIds = new uint16[](upSSIds_.length);
+        for (uint256 i = 0; i < upSSIds_.length; i++) {
+            upSSIds[i] = upSSIds_[i];
         }
     }
 
-    function setNormalLegendaryIds(uint16[] memory normalLegendaryIds_) external onlyOwner {
-        normalLegendaryIds = new uint16[](normalLegendaryIds_.length);
-        for (uint256 i = 0; i < normalLegendaryIds_.length; i++) {
-            normalLegendaryIds[i] = normalLegendaryIds_[i];
+    function setnSSSIds(uint16[] memory nSSSIds_) external onlyOwner {
+        nSSSIds = new uint16[](nSSSIds_.length);
+        for (uint256 i = 0; i < nSSSIds_.length; i++) {
+            nSSSIds[i] = nSSSIds_[i];
         }
     }
 
-    function setNormalRareIds(uint16[] memory normalRareIds_) external onlyOwner {
-        normalRareIds = new uint16[](normalRareIds_.length);
-        for (uint256 i = 0; i < normalRareIds_.length; i++) {
-            normalRareIds[i] = normalRareIds_[i];
+    function setnSSIds(uint16[] memory nSSIds_) external onlyOwner {
+        nSSIds = new uint16[](nSSIds_.length);
+        for (uint256 i = 0; i < nSSIds_.length; i++) {
+            nSSIds[i] = nSSIds_[i];
         }
     }
 
-    function setNormalCommonIds(uint16[] memory normalCommonIds_) external onlyOwner {
-        normalCommonIds = new uint16[](normalCommonIds_.length);
-        for (uint256 i = 0; i < normalCommonIds_.length; i++) {
-            normalCommonIds[i] = normalCommonIds_[i];
+    function setnSIds(uint16[] memory nSIds_) external onlyOwner {
+        nSIds = new uint16[](nSIds_.length);
+        for (uint256 i = 0; i < nSIds_.length; i++) {
+            nSIds[i] = nSIds_[i];
         }
     }
 
-    function getUpRareIdsLength() external view returns (uint256) {
-        return upRareIds.length;
+    function getupSSIdsLength() external view returns (uint256) {
+        return upSSIds.length;
     }
 
-    function getNormalLegendaryIdsLength() external view returns (uint256) {
-        return normalLegendaryIds.length;
+    function getnSSSIdsLength() external view returns (uint256) {
+        return nSSSIds.length;
     }
 
-    function getNormalRareIdsLength() external view returns (uint256) {
-        return normalRareIds.length;
+    function getnSSIdsLength() external view returns (uint256) {
+        return nSSIds.length;
     }
 
-    function getNormalCommonIdsLength() external view returns (uint256) {
-        return normalCommonIds.length;
+    function getnSIdsLength() external view returns (uint256) {
+        return nSIds.length;
     }
 
     function defaultCaptainIdForNewUser() external view returns (uint16) {
@@ -364,8 +360,8 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         styleVariantManager = IPFPDAOStyleVariantManager(variantManager_);
     }
 
-    function getRoleIdPoolBalance(uint16 roleId_) external view returns (uint256) {
-        return roleIdPoolBalance[roleId_ - 1];
+    function setDividend(address dividend_) external onlyOwner {
+        dividend = IDividend(dividend_);
     }
 
     /* upgradeable functions */

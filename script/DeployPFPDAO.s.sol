@@ -94,26 +94,26 @@ contract Deploy is Script {
         require(wrappedPoolV1.activeNonce() == 1);
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
-        uint16 upLegendaryId = 1;
-        uint16[] memory upRareIds = new uint16[](3);
-        upRareIds[0] = 2;
-        upRareIds[1] = 3;
-        upRareIds[2] = 4;
-        uint16[] memory normalLegendaryIds = new uint16[](0);
-        uint16[] memory normalRareIds = new uint16[](0);
-        uint16[] memory normalCommonIds = new uint16[](1);
-        normalCommonIds[0] = 0;
-        wrappedPoolV1.setUpLegendaryId(upLegendaryId);
-        wrappedPoolV1.setUpRareIds(upRareIds);
-        wrappedPoolV1.setNormalLegendaryIds(normalLegendaryIds);
-        wrappedPoolV1.setNormalRareIds(normalRareIds);
-        wrappedPoolV1.setNormalCommonIds(normalCommonIds);
+        uint16 upSSSId = 1;
+        uint16[] memory upSSIds = new uint16[](3);
+        upSSIds[0] = 2;
+        upSSIds[1] = 3;
+        upSSIds[2] = 4;
+        uint16[] memory nSSSIds = new uint16[](0);
+        uint16[] memory nSSIds = new uint16[](0);
+        uint16[] memory nSIds = new uint16[](1);
+        nSIds[0] = 0;
+        wrappedPoolV1.setupSSSId(upSSSId);
+        wrappedPoolV1.setupSSIds(upSSIds);
+        wrappedPoolV1.setnSSSIds(nSSSIds);
+        wrappedPoolV1.setnSSIds(nSSIds);
+        wrappedPoolV1.setnSIds(nSIds);
 
-        require(wrappedPoolV1.upLegendaryId() == 1);
-        require(wrappedPoolV1.getUpRareIdsLength() == 3);
-        require(wrappedPoolV1.getNormalLegendaryIdsLength() == 0);
-        require(wrappedPoolV1.getNormalRareIdsLength() == 0);
-        require(wrappedPoolV1.getNormalCommonIdsLength() == 1);
+        require(wrappedPoolV1.upSSSId() == 1);
+        require(wrappedPoolV1.getupSSIdsLength() == 3);
+        require(wrappedPoolV1.getnSSSIdsLength() == 0);
+        require(wrappedPoolV1.getnSSIdsLength() == 0);
+        require(wrappedPoolV1.getnSIdsLength() == 1);
 
         // 设置loot价格
         wrappedPoolV1.setPriceLootOne(vm.envInt("PRICE_ONE"));

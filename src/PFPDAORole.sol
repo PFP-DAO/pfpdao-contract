@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.18;
 
 import "./PFPDAO.sol";
 import {IPFPDAOStyleVariantManager} from "./IPFPDAOStyleVariantManager.sol";
+import {IDividend} from "./IDividend.sol";
+
+import "forge-std/console2.sol";
 
 error InvalidSlot();
+error NotReachLimit(uint8);
 error NotAllowed();
 error NotOwner();
 
@@ -26,6 +30,8 @@ contract PFPDAORole is PFPDAO {
     }
 
     mapping(uint256 => Exp) public exps;
+
+    IDividend public dividend;
 
     event LevelResult(uint256 indexed nftId, uint8 newLevel, uint32 newExp);
     event AwakeResult(uint256 indexed nftId, uint32 oldVariant, uint32 newVariant, uint8 newStyle);
@@ -67,7 +73,15 @@ contract PFPDAORole is PFPDAO {
         exps[nftId_].exp = newExp_;
     }
 
-    function _addExp(uint256 nftId_, uint32 exp_) private view returns (uint8, uint32, uint32) {
+    function getSpecial(uint8 level_) public pure returns (uint256) {
+        if (level_ < 20) return 0;
+        if (level_ < 40) return 1;
+        if (level_ < 80) return 5;
+        if (level_ < 90) return 10;
+        return 100;
+    }
+
+    function _addExp(uint256 nftId_, uint32 exp_) private view returns (uint8, uint8, uint32, uint32) {
         uint8 oldLevel = getLevel(nftId_);
         uint32 oldExp = getExp(nftId_);
         uint32 newExp = oldExp + exp_;
@@ -84,18 +98,25 @@ contract PFPDAORole is PFPDAO {
                     uint8 tmpOldLevel = newLevel - 1;
                     uint32 needLevelExp = expTable[tmpOldLevel - 1];
                     overflowExp = newExp;
-                    return (tmpOldLevel, needLevelExp, overflowExp);
+                    return (oldLevel, tmpOldLevel, needLevelExp, overflowExp);
                 }
             }
         }
-        return (newLevel, newExp, 0);
+        return (oldLevel, newLevel, newExp, 0);
     }
 
     function _levelUp(uint256 nftId_, uint32 addExp_) private returns (uint8, uint32, uint32) {
-        (uint8 level, uint32 exp, uint32 overflowExp) = _addExp(nftId_, addExp_);
+        (uint8 oldLevel, uint8 level, uint32 exp, uint32 overflowExp) = _addExp(nftId_, addExp_);
         exps[nftId_].level = level;
         exps[nftId_].exp = exp;
         emit LevelResult(nftId_, level, exp);
+        if (level > 19 && level > oldLevel) {
+            uint256 slot = slotOf(nftId_);
+            uint16 roleId = getRoleId(slot);
+            uint8 awakenLevel = getStyle(slot);
+            uint256 newRight = (level - oldLevel) * (awakenLevel - 1) * getSpecial(level);
+            dividend.addCaptainRight(_msgSender(), roleId, newRight);
+        }
         return (level, exp, overflowExp);
     }
 
@@ -169,35 +190,46 @@ contract PFPDAORole is PFPDAO {
         return variants;
     }
 
-    function awake(uint256 nftId_, uint256 burnNftId_) external returns (uint256) {
+    function awake(uint256 nftId_, uint256[] memory burnNftIds_) external returns (uint256) {
         uint256 nftMainSlot = slotOf(nftId_);
-        uint256 nftBurnSlot = slotOf(burnNftId_);
+        uint16 mainRoleId = getRoleId(nftMainSlot);
+        uint8 nftMainStyle = getStyle(nftMainSlot);
 
-        if (!reachLimitLevel(nftId_)) {
-            revert InvalidSlot();
+        require(burnNftIds_.length == 2 ** (nftMainStyle - 1), "Invalid burnNftIds length");
+
+        for (uint256 i; i < burnNftIds_.length; i++) {
+            uint256 burnNftId_ = burnNftIds_[i];
+            if (ownerOf(burnNftId_) != _msgSender()) {
+                revert NotOwner();
+            }
+            uint256 burnNftSlot_ = slotOf(burnNftId_);
+
+            if (mainRoleId != getRoleId(burnNftSlot_)) {
+                revert InvalidSlot();
+            }
+            _burn(burnNftId_);
         }
 
-        uint8 nftMainStyle = getStyle(nftMainSlot);
-        uint8 nftBurnStyle = getStyle(nftBurnSlot);
-        uint16 mainRoleId = getRoleId(nftMainSlot);
-        uint16 burnRoleId = getRoleId(nftBurnSlot);
-
-        if (nftMainStyle != nftBurnStyle || mainRoleId != burnRoleId) {
-            revert InvalidSlot();
+        if (!reachLimitLevel(nftId_)) {
+            revert NotReachLimit(getLevel(nftId_));
         }
 
         uint32 oldVariant = getVariant(nftMainSlot);
         uint32 newVariant = styleVariantManager.getRoleAwakenVariant(_msgSender(), mainRoleId, nftMainStyle + 1);
-
         uint8 newStyle = nftMainStyle + 1;
         uint256 newSlot = generateSlotWhenAwake(nftMainSlot, newVariant);
-
         _burn(nftId_);
-        _burn(burnNftId_);
         _mint(_msgSender(), nftId_, newSlot, 1);
 
-        _setLevel(nftId_, getLevel(nftId_) + 1);
+        uint8 oldLevel = getLevel(nftId_);
+        uint8 newLevel = oldLevel + 1;
+        _setLevel(nftId_, newLevel);
         _setExp(nftId_, 0);
+
+        uint256 oldRight = getSpecial(oldLevel) * oldLevel * (nftMainStyle - 1);
+        uint256 newRight = getSpecial(newLevel) * newLevel * (newStyle - 1);
+
+        dividend.addCaptainRight(_msgSender(), mainRoleId, newRight - oldRight);
 
         emit AwakeResult(nftId_, oldVariant, newVariant, newStyle);
         return newSlot;
@@ -240,6 +272,31 @@ contract PFPDAORole is PFPDAO {
         styleVariantManager = IPFPDAOStyleVariantManager(variantManager_);
     }
 
+    function setDividend(address dividend_) public onlyOwner {
+        dividend = IDividend(dividend_);
+    }
+
+    function getAwaken(uint8 level_) public pure returns (uint256) {
+        if (level_ < 20) return 0;
+        if (level_ < 40) return 1;
+        if (level_ < 60) return 2;
+        if (level_ < 80) return 3;
+        if (level_ < 90) return 4;
+        return 5;
+    }
+
+    function setRoleLevelAndExp(uint256 nftId_, uint8 level_, uint32 exp_) public onlyOwner {
+        uint8 oldLevel = getLevel(nftId_);
+        _setLevel(nftId_, level_);
+        _setExp(nftId_, exp_);
+
+        if (level_ > 19 && level_ > oldLevel) {
+            uint256 oldRight = getSpecial(oldLevel) * oldLevel * getAwaken(oldLevel);
+            uint256 newRight = getSpecial(level_) * level_ * getAwaken(level_);
+            dividend.addCaptainRight(ownerOf(nftId_), getRoleId(slotOf(nftId_)), newRight - oldRight);
+        }
+    }
+
     function _beforeValueTransfer(
         address from_,
         address to_,
@@ -249,8 +306,14 @@ contract PFPDAORole is PFPDAO {
         uint256 value_
     ) internal virtual override {
         super._beforeValueTransfer(from_, to_, fromTokenId_, toTokenId_, slot_, value_);
-        if (getLevel(fromTokenId_) < 60 && from_ != address(0) && to_ != address(0)) {
+        uint8 level = getLevel(fromTokenId_);
+        if (level < 60 && from_ != address(0) && to_ != address(0)) {
             revert Soulbound();
+        }
+
+        if (level > 59 && from_ != address(0) && to_ != address(0)) {
+            uint256 rightToTransfer = getSpecial(level) * level * getAwaken(level);
+            dividend.transferCaptainRight(from_, to_, getRoleId(slot_), rightToTransfer);
         }
     }
 }

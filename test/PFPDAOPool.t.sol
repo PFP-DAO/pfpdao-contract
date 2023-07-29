@@ -10,8 +10,12 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/SignatureCheckerU
 
 import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool, WhiteListUsed, InvalidSignature} from "../src/PFPDAOPool.sol";
+import {PFPDAOEquipMetadataDescriptor} from "../src/PFPDAOEquipMetadataDescriptor.sol";
 import {PFPDAORole, Soulbound} from "../src/PFPDAORole.sol";
 import {PFPDAOStyleVariantManager} from "../src/PFPDAOStyleVariantManager.sol";
+
+import {Dividend} from "../src/Dividend.sol";
+import {FiatToken} from "../src/FiatToken.sol";
 
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 
@@ -24,17 +28,29 @@ contract _PFPDAOPoolTest is PRBTest {
     PFPDAOPool implementationPoolV1;
     PFPDAOEquipment implementationEquipV1;
     PFPDAORole implementationRoleAV1;
+    PFPDAORole implementationRoleBV1;
+    PFPDAOEquipMetadataDescriptor implementationMetadataDescriptor;
     PFPDAOStyleVariantManager implementationStyleManagerV1;
+    Dividend implementationDividend;
+    FiatToken implementationUSDC;
 
     UUPSProxy proxyPool;
     UUPSProxy proxyEquip;
     UUPSProxy proxyRoleA;
+    UUPSProxy proxyRoleB;
+    UUPSProxy proxyMetadataDescriptor;
     UUPSProxy proxyStyleManager;
+    UUPSProxy proxyDividend;
+    UUPSProxy proxyUSDC;
 
     PFPDAOPool wrappedPoolV1;
     PFPDAOEquipment wrappedEquipV1;
     PFPDAORole wrappedRoleAV1;
+    PFPDAORole wrappedRoleBV1;
+    PFPDAOEquipMetadataDescriptor wrappedMetadataDescriptor;
     PFPDAOStyleVariantManager wrappedStyleManagerV1;
+    Dividend wrappedDividend;
+    FiatToken wrappedUSDC;
 
     address signer;
     uint256 signerPrivateKey = 0xabcdf1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
@@ -48,43 +64,59 @@ contract _PFPDAOPoolTest is PRBTest {
         implementationPoolV1 = new PFPDAOPool();
         implementationEquipV1 = new PFPDAOEquipment();
         implementationRoleAV1 = new PFPDAORole();
+        implementationRoleBV1 = new PFPDAORole();
+        implementationMetadataDescriptor = new PFPDAOEquipMetadataDescriptor();
         implementationStyleManagerV1 = new PFPDAOStyleVariantManager();
+        implementationDividend = new Dividend();
+        implementationUSDC = new FiatToken();
 
         // 部署代理合约并将其指向实现合约，这个是ERC1967Proxy
         proxyPool = new UUPSProxy(address(implementationPoolV1), "");
         proxyEquip = new UUPSProxy(address(implementationEquipV1), "");
         proxyRoleA = new UUPSProxy(address(implementationRoleAV1), "");
+        proxyRoleB = new UUPSProxy(address(implementationRoleBV1), "");
+        proxyMetadataDescriptor = new UUPSProxy(address(implementationMetadataDescriptor), "");
         proxyStyleManager = new UUPSProxy(address(implementationStyleManagerV1), "");
+        proxyDividend = new UUPSProxy(address(implementationDividend), "");
+        proxyUSDC = new UUPSProxy(address(implementationUSDC), "");
 
         // 将代理合约包装成ABI，以支持更容易的调用
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
+        wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
+        wrappedMetadataDescriptor = PFPDAOEquipMetadataDescriptor(address(proxyMetadataDescriptor));
         wrappedStyleManagerV1 = PFPDAOStyleVariantManager(address(proxyStyleManager));
+        wrappedDividend = Dividend(address(proxyDividend));
+        wrappedUSDC = FiatToken(address(proxyUSDC));
 
         // 初始化合约
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedPoolV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedEquipV1.initialize();
         wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
+        wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
         wrappedStyleManagerV1.initialize(address(wrappedPoolV1), address(wrappedRoleAV1));
         wrappedRoleAV1.setStyleVariantManager(address(proxyStyleManager));
+        wrappedRoleBV1.setStyleVariantManager(address(proxyStyleManager));
+        wrappedDividend.initialize(address(wrappedUSDC), address(wrappedPoolV1), address(wrappedRoleAV1));
+        wrappedUSDC.initialize();
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
-        uint16 upLegendaryId = 1;
-        uint16[] memory upRareIds = new uint16[](3);
-        upRareIds[0] = 2;
-        upRareIds[1] = 3;
-        upRareIds[2] = 4;
-        uint16[] memory normalLegendaryIds = new uint16[](0);
-        uint16[] memory normalRareIds = new uint16[](0);
-        uint16[] memory normalCommonIds = new uint16[](1);
-        normalCommonIds[0] = 0;
-        wrappedPoolV1.setUpLegendaryId(upLegendaryId);
-        wrappedPoolV1.setUpRareIds(upRareIds);
-        wrappedPoolV1.setNormalLegendaryIds(normalLegendaryIds);
-        wrappedPoolV1.setNormalRareIds(normalRareIds);
-        wrappedPoolV1.setNormalCommonIds(normalCommonIds);
+        uint16 upSSSId = 1;
+        uint16[] memory upSSIds = new uint16[](3);
+        upSSIds[0] = 2;
+        upSSIds[1] = 3;
+        upSSIds[2] = 4;
+        uint16[] memory nSSSIds = new uint16[](0);
+        uint16[] memory nSSIds = new uint16[](0);
+        uint16[] memory nSIds = new uint16[](1);
+        nSIds[0] = 0;
+        wrappedPoolV1.setupSSSId(upSSSId);
+        wrappedPoolV1.setupSSIds(upSSIds);
+        wrappedPoolV1.setnSSSIds(nSSSIds);
+        wrappedPoolV1.setnSSIds(nSSIds);
+        wrappedPoolV1.setnSIds(nSIds);
 
         wrappedEquipV1.addActivePool(address(proxyPool));
         wrappedRoleAV1.addActivePool(address(proxyPool));
@@ -96,60 +128,63 @@ contract _PFPDAOPoolTest is PRBTest {
 
         wrappedPoolV1.setTreasury(treasury);
         wrappedPoolV1.setSigner(signer);
-        wrappedPoolV1.setActiveNonce(1);
+        wrappedPoolV1.setDividend(address(proxyDividend));
+
+        wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
+
+        wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
 
         // vm mock user1 100 eth
         vm.deal(user1, 100 ether);
-        vm.deal(user2, 100 ether);
 
         // warp to 3 is bad lucky
         vm.warp(3);
     }
 
     function testSetUpPoolId() public {
-        assertEq(wrappedPoolV1.upLegendaryId(), 1);
-        assertEq(wrappedPoolV1.upRareIds(0), 2);
-        assertEq(wrappedPoolV1.upRareIds(1), 3);
-        assertEq(wrappedPoolV1.upRareIds(2), 4);
+        assertEq(wrappedPoolV1.upSSSId(), 1);
+        assertEq(wrappedPoolV1.upSSIds(0), 2);
+        assertEq(wrappedPoolV1.upSSIds(1), 3);
+        assertEq(wrappedPoolV1.upSSIds(2), 4);
         vm.expectRevert();
-        wrappedPoolV1.upRareIds(3);
+        wrappedPoolV1.upSSIds(3);
         vm.expectRevert();
-        assertEq(wrappedPoolV1.normalLegendaryIds(0), 0);
+        assertEq(wrappedPoolV1.nSSSIds(0), 0);
         vm.expectRevert();
-        assertEq(wrappedPoolV1.normalRareIds(0), 0);
-        assertEq(wrappedPoolV1.normalCommonIds(0), 0);
+        assertEq(wrappedPoolV1.nSSIds(0), 0);
+        assertEq(wrappedPoolV1.nSIds(0), 0);
 
         // 第二期有8个角色，0是装备，1是legendary, 2-4是rare，5是legendary, 6-8是rare
-        uint16 upLegendaryId = 5;
-        uint16[] memory upRareIds = new uint16[](3);
-        upRareIds[0] = 6;
-        upRareIds[1] = 7;
-        upRareIds[2] = 8;
-        uint16[] memory normalLegendaryIds = new uint16[](1);
-        normalLegendaryIds[0] = 1;
-        uint16[] memory normalRareIds = new uint16[](3);
-        normalRareIds[0] = 2;
-        normalRareIds[1] = 3;
-        normalRareIds[2] = 4;
-        uint16[] memory normalCommonIds = new uint16[](1);
-        normalCommonIds[0] = 0;
-        wrappedPoolV1.setUpLegendaryId(upLegendaryId);
-        wrappedPoolV1.setUpRareIds(upRareIds);
-        wrappedPoolV1.setNormalLegendaryIds(normalLegendaryIds);
-        wrappedPoolV1.setNormalRareIds(normalRareIds);
-        wrappedPoolV1.setNormalCommonIds(normalCommonIds);
+        uint16 upSSSId = 5;
+        uint16[] memory upSSIds = new uint16[](3);
+        upSSIds[0] = 6;
+        upSSIds[1] = 7;
+        upSSIds[2] = 8;
+        uint16[] memory nSSSIds = new uint16[](1);
+        nSSSIds[0] = 1;
+        uint16[] memory nSSIds = new uint16[](3);
+        nSSIds[0] = 2;
+        nSSIds[1] = 3;
+        nSSIds[2] = 4;
+        uint16[] memory nSIds = new uint16[](1);
+        nSIds[0] = 0;
+        wrappedPoolV1.setupSSSId(upSSSId);
+        wrappedPoolV1.setupSSIds(upSSIds);
+        wrappedPoolV1.setnSSSIds(nSSSIds);
+        wrappedPoolV1.setnSSIds(nSSIds);
+        wrappedPoolV1.setnSIds(nSIds);
 
-        assertEq(wrappedPoolV1.upLegendaryId(), 5);
-        assertEq(wrappedPoolV1.upRareIds(0), 6);
-        assertEq(wrappedPoolV1.upRareIds(1), 7);
-        assertEq(wrappedPoolV1.upRareIds(2), 8);
+        assertEq(wrappedPoolV1.upSSSId(), 5);
+        assertEq(wrappedPoolV1.upSSIds(0), 6);
+        assertEq(wrappedPoolV1.upSSIds(1), 7);
+        assertEq(wrappedPoolV1.upSSIds(2), 8);
         vm.expectRevert();
-        wrappedPoolV1.upRareIds(3);
-        assertEq(wrappedPoolV1.normalLegendaryIds(0), 1);
-        assertEq(wrappedPoolV1.normalRareIds(0), 2);
-        assertEq(wrappedPoolV1.normalRareIds(1), 3);
-        assertEq(wrappedPoolV1.normalRareIds(2), 4);
-        assertEq(wrappedPoolV1.normalCommonIds(0), 0);
+        wrappedPoolV1.upSSIds(3);
+        assertEq(wrappedPoolV1.nSSSIds(0), 1);
+        assertEq(wrappedPoolV1.nSSIds(0), 2);
+        assertEq(wrappedPoolV1.nSSIds(1), 3);
+        assertEq(wrappedPoolV1.nSSIds(2), 4);
+        assertEq(wrappedPoolV1.nSIds(0), 0);
     }
 
     function testLoot1_newUser() public {
@@ -158,6 +193,12 @@ contract _PFPDAOPoolTest is PRBTest {
         assertEq(wrappedEquipV1.balanceOf(user1) + wrappedRoleAV1.balanceOf(user1), 1);
         assertEq(wrappedEquipV1.balanceOf(1), 1);
         assertEq(wrappedEquipV1.balanceOf(user1), 1);
+    }
+
+    function testFuzz_Loot10(uint256 height_) public {
+        vm.warp(height_);
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}();
     }
 
     function testLoot10_newUser() public {
@@ -325,6 +366,7 @@ contract _PFPDAOPoolTest is PRBTest {
     using SignatureCheckerUpgradeable for address;
 
     function testWhitelistLoot5() public {
+        wrappedPoolV1.setActiveNonce(1);
         address user = address(0x49E53Fb3d5bf1532fEBAD88a1979E33A94844d1d);
         uint8 times = 1;
         uint8 nonce = 1;
@@ -381,6 +423,7 @@ contract _PFPDAOPoolTest is PRBTest {
         assertEq(4, wrappedRoleAV1.balanceOf(user1));
 
         vm.warp(10);
+        vm.deal(user2, 22 ether);
         vm.startPrank(user2);
         wrappedPoolV1.loot10{value: 22 ether}();
         assertEq(
