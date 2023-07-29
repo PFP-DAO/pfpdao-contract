@@ -1,12 +1,16 @@
 source .env
 
-# forge script script/DeployPFPDAO.s.sol:Deploy --chain-id $CHAIN --fork-url $RPC_URL --broadcast --via-ir  -vvv
-# forge script script/InitPFPDAO.s.sol:InitPFPDAO --chain-id $CHAIN --fork-url $RPC_URL --broadcast --via-ir -vvvv
+forge script script/DeployPFPDAO.s.sol:Deploy --chain-id $CHAIN --fork-url $RPC_URL 
+# forge script script/InitPFPDAO.s.sol:InitPFPDAO --chain-id $CHAIN --fork-url $RPC_URL -vvv
 
-# forge script script/DeployEquipMetadataDescriptor.s.sol:DeployEquipMetadataDescriptor --chain-id $CHAIN --fork-url $RPC_URL --broadcast --via-ir  -vvv
-# forge verify-contract 0x7b72A93777Dbe6D5309Db43d6d476EeC651d6eB7 src/PFPDAOEquipMetadataDescriptor.sol:PFPDAOEquipMetadataDescriptor --watch
+# forge script script/AddExp.s.sol:AddExp --chain-id $CHAIN --fork-url $RPC_URL  --broadcast --via-ir  -vvv
 
-# cast call $POOL_ADDRESS "getUpRareIdsLength()(uint256)" --rpc-url $RPC_URL
+# forge script script/DeployEquipMetadataDescriptor.s.sol:DeployEquipMetadataDescriptor --chain-id $CHAIN --fork-url $RPC_URL --broadcast --verify -vv
+# forge verify-contract 0xb2e268d2b3d52842Da11146211D3cBD797570554 PFPDAOEquipMetadataDescriptor --watch
+
+# forge verify-contract 0x2270b742C9FBf25410f256a20e1c2Ac64F7c3ecF PFPDAORole --watch
+
+# cast call $POOL_ADDRESS "getupSSIdsLength()(uint256)" --rpc-url $RPC_URL
 # cast call $POOL_ADDRESS "activeNonce()(uint8)" --rpc-url $RPC_URL
 
 # forge script script/Test3525.s.sol:TestERC3525Script --fork-url $RPC_URL -vv --broadcast
@@ -14,16 +18,20 @@ source .env
 
 # forge script script/SetUpPool.s.sol:SetUpPool --chain-id $CHAIN --fork-url $RPC_URL -vv
 
-# forge script script/UpgradePool.s.sol:UpgradePool --chain-id $CHAIN --fork-url $RPC_URL -vv
+# forge script script/UpgradeEquipMetadataDescriptor.s.sol:UpgradeEquipMetadataDescriptor --chain-id $CHAIN --fork-url $RPC_URL -vv
+
+# forge script script/UpgradePool.s.sol:UpgradePool --chain-id $CHAIN --fork-url $RPC_URL --broadcast
 # forge verify-contract  0x66d849084de11c753193f945649c39e61a982b9f PFPDAOPool $POLYGONSCAN_API_KEY --verifier-url $VERIFIER_URL
 
-# forge script script/UpgradeRole.s.sol:UpgradeRole --chain-id $CHAIN --fork-url $RPC_URL --broadcast -vv
-# forge verify-contract  0x472ee4fd6581f5eb1c3264e2295ec3771bc145e5 PFPDAORole $POLYGONSCAN_API_KEY --verifier-url $VERIFIER_URL
+# forge script script/UpgradeRole.s.sol:UpgradeRole --chain-id $CHAIN --fork-url $RPC_URL --broadcast
+# forge script script/Airdrop.s.sol:Airdrop --chain-id $CHAIN --fork-url $RPC_URL --broadcast
+# forge verify-contract  0x61c5B27d18Df92151f40dBc12B88B57C7980bd6a PFPDAORole $POLYGONSCAN_API_KEY --verifier-url $VERIFIER_URL --optimizer-runs=100 --show-standard-json-input > etherscan.json
 # forge verify-contract \
-# --constructor-args $(cast abi-encode "constructor(string,string)" "PFPDAORoleA" "PFPRA") \
-# 0xbE0A8ce3Ca98d5806B7f8dA015eaBcFb4738592A src/UUPSProxy.sol:UUPSProxy $POLYGONSCAN_API_KEY --verifier-url $VERIFIER_URL
+# --constructor-args $(cast abi-encode "constructor(address,bytes)" 0x76FD1559E1B753b072b1523AB1C03aBe12916F28 "") \
+# 0x819Fb32538862d5E788937CADcfa2FD8764A7c84 src/UUPSProxy.sol:UUPSProxy $POLYGONSCAN_API_KEY --verifier-url $VERIFIER_URL  --optimizer-runs=100 --show-standard-json-input > etherscan.json
 
-# forge script script/UpgradeEquip.s.sol:UpgradeEquip --chain-id $CHAIN --fork-url $RPC_URL  --broadcast -vv 
+
+# forge script script/UpgradeEquip.s.sol:UpgradeEquip --chain-id $CHAIN --fork-url $RPC_URL --verify  --broadcast -vv 
 
 # forge script script/DeployOGColourSBT.s.sol:D/eploySBT --chain-id $CHAIN --fork-url $RPC_URL --etherscan-api-key $POLYGONSCAN_API_KEY --broadcast -vvvv
 # forge verify-contract 0x6DB49aF834786c85B8D8caB9246eEF9DA928f362 src/OGColourSBT.sol:OGColourSBT $POLYGONSCAN_API_KEY --verifier-url $VERIFIER_URL
