@@ -7,24 +7,32 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/SignatureCheckerUpgradeable.sol";
+import "@uniswap/periphery/interfaces/IUniswapV2Router02.sol";
+import "@uniswap/periphery/interfaces/IWETH.sol";
+import "@uniswap/periphery/interfaces/IERC20.sol";
+import "@chainlink/interfaces/AggregatorV3Interface.sol";
 
 import {PFPDAO} from "./PFPDAO.sol";
 import {IPFPDAOStyleVariantManager} from "./IPFPDAOStyleVariantManager.sol";
 import {PFPDAOEquipment} from "./PFPDAOEquipment.sol";
 import {PFPDAORole} from "./PFPDAORole.sol";
 import {IDividend} from "./IDividend.sol";
+import {Utils} from "./libraries/Utils.sol";
 
 error InvalidSignature();
 error WhiteListUsed(uint8);
 error InvaildLootTimes();
+error USDCPaymentFailed();
+error NotEnoughMATIC();
 
 contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
     using ECDSAUpgradeable for bytes32;
     using SignatureCheckerUpgradeable for address;
 
     // Replacing original variables from PFPDAORoleVariantManager with a storage gap of 52 slots
-    uint256[50] private ___gap;
+    uint256[49] private ___gap;
 
+    AggregatorV3Interface internal dataFeed;
     IDividend public dividend;
     IPFPDAOStyleVariantManager private styleVariantManager;
 
@@ -47,51 +55,64 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     uint16[] public nSIds;
 
     // 50% of the funds go into the pool associated with the character.
-    mapping(uint16 => uint256) public roleIdPoolBalance;
-    uint16 _defaultRoleIdForNewUser;
+    mapping(uint16 => uint256) public oldRoleIdPoolBalance;
+    uint16 _defaultRoleIdForNewUser; // deprecated
 
-    mapping(address => bool) public oldFreeLooted;
+    mapping(address => bool) public oldFreeLooted; // deprecated
     mapping(address => uint8) public isWhitelistLooted;
 
     uint8 public activeNonce;
     address public signer;
     address public treasury;
+    address public relayer;
+    IUniswapV2Router02 public router;
+    IWETH public weth;
+    IERC20 public usdc;
+    bool private _useNewPrice;
 
     event LootResult(address indexed user, uint256 slot, uint8 balance);
     event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
-
-    // constructor() {
-    //     _disableInitializers();
-    // }
 
     function initialize(address equipmentAddress_, address roleNFTAddress_) public initializer {
         __Ownable_init();
         __UUPSUpgradeable_init();
         roleNFT = PFPDAORole(roleNFTAddress_);
         equipmentNFT = PFPDAOEquipment(equipmentAddress_);
-
-        _defaultRoleIdForNewUser = 1;
-
-        priceLootOne = 2.8e18;
-        priceLootTen = 22e18;
     }
 
-    modifier loot1PayVerify() {
-        int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootOne / lastPrice);
-        require(msg.value > shouldPay, "No enough MATIC");
+    modifier loot1PayVerify(bool usdc_) {
+        if (usdc_) {
+            bool success = usdc.transferFrom(_msgSender(), address(this), uint256(priceLootOne));
+            if (!success) revert USDCPaymentFailed();
+        } else {
+            int256 lastPrice = _useNewPrice ? int256(10 ** 8) : getLatestPrice();
+            uint256 shouldPay = uint256(priceLootOne * int256(10 ** 20) / lastPrice);
+
+            if (msg.value < shouldPay) revert NotEnoughMATIC();
+        }
         _;
     }
 
-    modifier loot10PayVerify() {
-        int256 lastPrice = getLatestPrice();
-        uint256 shouldPay = uint256(priceLootTen / lastPrice);
-        require(msg.value > shouldPay, "No enough MATIC");
+    modifier loot10PayVerify(bool usdc_) {
+        if (usdc_) {
+            bool success = usdc.transferFrom(_msgSender(), address(this), uint256(priceLootTen));
+            if (!success) revert USDCPaymentFailed();
+        } else {
+            int256 lastPrice = _useNewPrice ? int256(10 ** 8) : getLatestPrice();
+            uint256 shouldPay = uint256((priceLootTen * 10 ** 20) / lastPrice);
+            if (msg.value < shouldPay) revert NotEnoughMATIC();
+        }
         _;
     }
 
-    function getLatestPrice() public pure returns (int256) {
-        return 10000000; // price 100000000 == 1 U for mock
+    modifier onlyRelayer() {
+        require(_msgSender() == relayer, "Only relayer");
+        _;
+    }
+
+    function getLatestPrice() public view returns (int256) {
+        (, int256 answer,,,) = dataFeed.latestRoundData();
+        return answer;
     }
 
     function whitelistLoot(uint8 time_, bytes calldata _signature) external {
@@ -117,12 +138,10 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     function _loot1() private {
         uint256 tmpSlot = _mintLogic(1);
 
-        if (equipmentNFT.getRarity(tmpSlot) == 0) {
+        if (Utils.getRarity(tmpSlot) == 0) {
             equipmentNFT.mint(_msgSender(), tmpSlot, 1);
-            // console2.log("[loot1] equipment slot: %s, balance: %s", tmpSlot, 1);
         } else {
             roleNFT.mint(_msgSender(), tmpSlot);
-            // console2.log("[loot1] role slot: %s, balance: %s", tmpSlot, 1);
         }
 
         emit LootResult(_msgSender(), tmpSlot, 1);
@@ -131,11 +150,11 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         );
     }
 
-    function loot1() external payable loot1PayVerify {
+    function loot1(bool usdc_) external payable loot1PayVerify(usdc_) {
         _loot1();
     }
 
-    function loot1(uint16 captainId_, uint256 nftId_) external payable loot1PayVerify {
+    function loot1(uint16 captainId_, uint256 nftId_, bool usdc_) external payable loot1PayVerify(usdc_) {
         dividend.claim(_msgSender(), captainId_);
         _loot1();
         roleNFT.levelUpWhenLoot(nftId_, 2);
@@ -165,7 +184,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
             if (balance[i] == 0) continue;
             uint256 tmpSlot = slots[i];
             uint8 tmpBalance = balance[i];
-            if (roleNFT.getRarity(slots[i]) == 0) {
+            if (Utils.getRarity(slots[i]) == 0) {
                 equipmentNFT.mint(_msgSender(), tmpSlot, tmpBalance);
             } else {
                 roleNFT.mint(_msgSender(), tmpSlot);
@@ -178,11 +197,11 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         );
     }
 
-    function loot10() external payable loot10PayVerify {
+    function loot10(bool usdc_) external payable loot10PayVerify(usdc_) {
         _lootN(10);
     }
 
-    function loot10(uint16 captainId_, uint256 nftId_) external payable loot10PayVerify {
+    function loot10(uint16 captainId_, uint256 nftId_, bool usdc_) external payable loot10PayVerify(usdc_) {
         dividend.claim(_msgSender(), captainId_);
         _lootN(10);
         roleNFT.levelUpWhenLoot(nftId_, 20);
@@ -269,7 +288,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         if (rarity != 0) {
             variant = styleVariantManager.getRoleAwakenVariant(_msgSender(), roleId, 1);
         }
-        return roleNFT.generateSlot(roleId, rarity, variant, 1);
+        return Utils.generateSlot(roleId, rarity, variant, 1);
     }
 
     /* admin functions */
@@ -305,6 +324,10 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         }
     }
 
+    function setUseNewPrice(bool useNewPrice_) external onlyOwner {
+        _useNewPrice = useNewPrice_;
+    }
+
     function getupSSIdsLength() external view returns (uint256) {
         return upSSIds.length;
     }
@@ -321,12 +344,58 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         return nSIds.length;
     }
 
-    function defaultCaptainIdForNewUser() external view returns (uint16) {
-        return _defaultRoleIdForNewUser;
+    function dailyDivide(uint16[] calldata roleIds, uint256[] calldata roleIdPoolBalanceToday_) external onlyRelayer {
+        require(1 + upSSIds.length + nSSSIds.length + nSSIds.length == roleIds.length, "Need all roleIds");
+        require(roleIds.length == roleIdPoolBalanceToday_.length, "RoleIds length isn't equal balance's");
+
+        uint256 maticBalance = address(this).balance;
+        if (maticBalance > 0) {
+            _swapMaticToUSDC(maticBalance);
+        }
+
+        uint256 usdcBalance = usdc.balanceOf(address(this));
+        if (usdcBalance > 0) {
+            bool toDividendDone = usdc.transfer(address(dividend), usdcBalance / 2);
+            bool toTreasuryDone = usdc.transfer(address(treasury), usdcBalance / 2);
+            require(toDividendDone && toTreasuryDone, "USDC transfer failed");
+        }
+
+        uint256 activeBatch = dividend.batch();
+        uint256 newBatch = activeBatch + 1;
+        // roleIdPoolBalanceToday_总和 可能会比 usdcBalance/2 更大一点
+        for (uint256 i = 0; i < roleIds.length; i++) {
+            dividend.updateRoleIdPoolBalance(newBatch, roleIds[i], roleIdPoolBalanceToday_[i]);
+        }
+        dividend.setNewBatch();
     }
 
-    function setDefaultRoleIdForNewUser(uint16 roleId_) external onlyOwner {
-        _defaultRoleIdForNewUser = roleId_;
+    function _swapMaticToUSDC(uint256 amount_) private {
+        int256 lastPrice = getLatestPrice();
+        uint256 amountOutMin = uint256(lastPrice) * amount_ * 95 / 10 ** 22; // 5% slippage
+        address[] memory path = new address[](2);
+        path[0] = address(weth);
+        path[1] = address(usdc);
+        router.swapExactETHForTokens{value: amount_}(amountOutMin, path, address(this), block.timestamp + 5 minutes);
+    }
+
+    function setRelayer(address relayer_) external onlyOwner {
+        relayer = relayer_;
+    }
+
+    function setSwapRouter(address router_) external onlyOwner {
+        router = IUniswapV2Router02(router_);
+    }
+
+    function setWETH(address weth_) external onlyOwner {
+        weth = IWETH(weth_);
+    }
+
+    function setUSDC(address usdc_) external onlyOwner {
+        usdc = IERC20(usdc_);
+    }
+
+    function setFeed(address oracle_) external onlyOwner {
+        dataFeed = AggregatorV3Interface(oracle_);
     }
 
     function setActiveNonce(uint8 nonce_) external onlyOwner {
@@ -336,7 +405,9 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     // withdraw eth
     function withdraw() external onlyOwner {
         uint256 balance = address(this).balance;
-        payable(treasury).transfer(balance);
+        // payable(treasury).transfer(balance);
+        (bool success,) = treasury.call{value: balance}("");
+        require(success, "Transfer failed.");
     }
 
     // set treasury

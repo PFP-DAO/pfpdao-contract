@@ -74,7 +74,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             281,
             309,
             340,
-            374,
+            374, // 39 to 40
             411,
             453,
             498,
@@ -94,7 +94,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             1891,
             2080,
             2288,
-            2516,
+            2516, // 59 to 60
             2768,
             3045,
             3349,
@@ -114,7 +114,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             12719,
             13991,
             15390,
-            16929,
+            16929, // 79 to 80
             18622,
             20484,
             22532,
@@ -124,44 +124,9 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
             32990,
             36289,
             39918,
-            43909
+            43909 // 89 to 90
         ];
         levelNeedAwakening = [20, 40, 60, 80, 90];
-    }
-
-    function generateSlot(uint16 roleId_, uint8 rarity_, uint32 variant_, uint8 style_) public pure returns (uint256) {
-        uint256 slot = uint256(roleId_) << 88;
-        slot |= uint256(rarity_) << 80;
-        slot |= uint256(variant_) << 48;
-        slot |= uint256(style_) << 40;
-        return slot;
-    }
-
-    function getRoleId(uint256 slot_) public pure returns (uint16) {
-        return uint16((slot_ >> 88) & 0xFFFF);
-    }
-
-    function getRarity(uint256 slot_) public pure returns (uint8) {
-        return uint8((slot_ >> 80) & 0xFF);
-    }
-
-    function getVariant(uint256 slot_) public pure returns (uint32) {
-        uint32 variant = uint32((slot_ >> 48) & 0xFFFFFFFF);
-        return variant;
-    }
-
-    /**
-     * @dev new Role style start from 1
-     */
-    function getStyle(uint256 slot_) public pure returns (uint8) {
-        return uint8((slot_ >> 40) & 0xFF);
-    }
-
-    /**
-     * @dev uint32 for future use
-     */
-    function getReserved(uint256 slot_) public pure returns (uint32) {
-        return uint32(slot_ >> 8 & 0xFFFFFFFF);
     }
 
     function isActivePool(address pool_) external view returns (bool) {

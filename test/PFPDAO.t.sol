@@ -7,11 +7,11 @@ import "forge-std/console2.sol";
 import {PFPDAOEquipment, NotBurner} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool} from "../src/PFPDAOPool.sol";
 import {PFPDAOEquipMetadataDescriptor} from "../src/PFPDAOEquipMetadataDescriptor.sol";
-import {PFPDAORole, Soulbound, InvalidSlot, NotAllowed, NotOwner} from "../src/PFPDAORole.sol";
+import {PFPDAORole, Soulbound, InvalidSlot, NotAllowed, NotOwner, InvalidLength} from "../src/PFPDAORole.sol";
 import {PFPDAOStyleVariantManager} from "../src/PFPDAOStyleVariantManager.sol";
 import {Dividend} from "../src/Dividend.sol";
 import {FiatToken} from "../src/FiatToken.sol";
-
+import {Utils} from "../src/libraries/Utils.sol";
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 
 contract _PFPDAOTest is PRBTest {
@@ -92,6 +92,7 @@ contract _PFPDAOTest is PRBTest {
         wrappedRoleBV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedDividend.initialize(address(wrappedUSDC), address(wrappedPoolV1), address(wrappedRoleAV1));
         wrappedUSDC.initialize();
+        wrappedPoolV1.setUseNewPrice(true);
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
         uint16 upSSSId = 1;
@@ -108,6 +109,8 @@ contract _PFPDAOTest is PRBTest {
         wrappedPoolV1.setnSSSIds(nSSSIds);
         wrappedPoolV1.setnSSIds(nSSIds);
         wrappedPoolV1.setnSIds(nSIds);
+        wrappedPoolV1.setPriceLootOne(2800000);
+        wrappedPoolV1.setPriceLootTen(22000000);
 
         wrappedEquipV1.addActivePool(address(proxyPool));
         wrappedRoleAV1.addActivePool(address(proxyPool));
@@ -134,7 +137,7 @@ contract _PFPDAOTest is PRBTest {
 
     function _loot10GetARole() private {
         vm.prank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
     }
 
     function testCanInitialize() public {
@@ -154,11 +157,11 @@ contract _PFPDAOTest is PRBTest {
 
     // Test Role function
     function testGetSlotProps() public {
-        uint256 tempSlot = wrappedRoleAV1.generateSlot(1, 0, 1023, 1);
-        assertEq(wrappedRoleAV1.getRoleId(tempSlot), 1);
-        assertEq(wrappedRoleAV1.getRarity(tempSlot), 0);
-        assertEq(wrappedRoleAV1.getVariant(tempSlot), 1023);
-        assertEq(wrappedRoleAV1.getStyle(tempSlot), 1);
+        uint256 tempSlot = Utils.generateSlot(1, 0, 1023, 1);
+        assertEq(Utils.getRoleId(tempSlot), 1);
+        assertEq(Utils.getRarity(tempSlot), 0);
+        assertEq(Utils.getVariant(tempSlot), 1023);
+        assertEq(Utils.getStyle(tempSlot), 1);
     }
 
     function testActivePool() public {
@@ -170,7 +173,7 @@ contract _PFPDAOTest is PRBTest {
 
     function testSoulbound() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
 
         vm.expectRevert(Soulbound.selector);
         wrappedRoleAV1.safeTransferFrom(user1, user2, 1);
@@ -197,7 +200,7 @@ contract _PFPDAOTest is PRBTest {
         vm.deal(user2, 22 ether);
         vm.prank(user2);
         vm.warp(6);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
         string memory roleUri2 = wrappedRoleAV1.tokenURI(2); // This will be Mico
         assertEq(roleUri2, "https://pfpdao-0.4everland.store/metadata/4/V1_0/role_4_V1_0_2_Mico.json");
     }
@@ -239,7 +242,7 @@ contract _PFPDAOTest is PRBTest {
 
     function testLevelUp() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
         vm.expectRevert(NotAllowed.selector);
         wrappedRoleAV1.levelUpWhenLoot(1, 1);
     }
@@ -257,7 +260,7 @@ contract _PFPDAOTest is PRBTest {
 
     function testBurn() public {
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
         // if no allowed burner, revert
         vm.expectRevert(abi.encodeWithSelector(NotBurner.selector, user1));
         wrappedEquipV1.burn(1);
@@ -267,7 +270,7 @@ contract _PFPDAOTest is PRBTest {
         setAllowBurners();
 
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
 
         // user should have 1 role and 1 equip, equip balance is 9
         assertEq(wrappedRoleAV1.balanceOf(user1), 1);
@@ -287,8 +290,8 @@ contract _PFPDAOTest is PRBTest {
         setAllowBurners();
 
         vm.startPrank(user1);
-        wrappedPoolV1.loot10{value: 22 ether}();
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
+        wrappedPoolV1.loot10{value: 22 ether}(false);
 
         // user should have 2 role and 2 equip, equip balance is 9, 9
         assertEq(wrappedRoleAV1.balanceOf(user1), 2);
@@ -326,11 +329,11 @@ contract _PFPDAOTest is PRBTest {
         vm.deal(user2, 22 ether);
         vm.prank(user2);
         vm.warp(6);
-        wrappedPoolV1.loot10{value: 22 ether}();
+        wrappedPoolV1.loot10{value: 22 ether}(false);
 
         // equipmentIds is empty
         uint256[] memory equipmentIdsEmpty = new uint256[](0);
-        vm.expectRevert("EquipmentIds is empty");
+        vm.expectRevert(InvalidLength.selector);
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsEmpty);
 
         uint256[] memory equipmentIdsUser1 = new uint256[](1);
@@ -366,11 +369,10 @@ contract _PFPDAOTest is PRBTest {
         wrappedRoleAV1.airdrop(recipients, 3, 1);
 
         vm.startPrank(user1);
-        wrappedPoolV1.loot1{value: 2.8 ether}();
-        wrappedPoolV1.loot1{value: 2.8 ether}();
-        wrappedPoolV1.loot1{value: 2.8 ether}();
-        wrappedPoolV1.loot1{value: 2.8 ether}();
-        console2.log(wrappedEquipV1.balanceOf(user1));
+        wrappedPoolV1.loot1{value: 2.8 ether}(false);
+        wrappedPoolV1.loot1{value: 2.8 ether}(false);
+        wrappedPoolV1.loot1{value: 2.8 ether}(false);
+        wrappedPoolV1.loot1{value: 2.8 ether}(false);
 
         uint256[] memory equipmentIds = new uint256[](4);
         equipmentIds[0] = 1;
@@ -396,23 +398,23 @@ contract _PFPDAOTest is PRBTest {
     // }
 
     function testGenerateSlotWhenAwake() public {
-        uint256 oldSlot = wrappedRoleAV1.generateSlot(2, 1, 88, 1); // 88 variant's roldId 1 style1
-        uint256 newSlot = wrappedRoleAV1.generateSlotWhenAwake(oldSlot, 10); // 10 variant's roldId 1 style2
-        assertEq(wrappedRoleAV1.getRoleId(newSlot), 2);
-        assertEq(wrappedRoleAV1.getRarity(newSlot), 1);
-        assertEq(wrappedRoleAV1.getStyle(newSlot), 2);
-        assertEq(wrappedRoleAV1.getVariant(newSlot), 10);
-        uint32[] memory oldVariants = wrappedRoleAV1.getVariants(newSlot);
+        uint256 oldSlot = Utils.generateSlot(2, 1, 88, 1); // 88 variant's roldId 1 style1
+        uint256 newSlot = Utils.generateSlotWhenAwake(oldSlot, 10); // 10 variant's roldId 1 style2
+        assertEq(Utils.getRoleId(newSlot), 2);
+        assertEq(Utils.getRarity(newSlot), 1);
+        assertEq(Utils.getStyle(newSlot), 2);
+        assertEq(Utils.getVariant(newSlot), 10);
+        uint32[] memory oldVariants = Utils.getVariants(newSlot);
 
         assertEq(oldVariants[0], 88);
         assertEq(oldVariants.length, 1);
 
-        uint256 newSlot2 = wrappedRoleAV1.generateSlotWhenAwake(newSlot, 3);
-        assertEq(wrappedRoleAV1.getRoleId(newSlot2), 2);
-        assertEq(wrappedRoleAV1.getRarity(newSlot2), 1);
-        assertEq(wrappedRoleAV1.getStyle(newSlot2), 3);
-        assertEq(wrappedRoleAV1.getVariant(newSlot2), 3);
-        uint32[] memory oldVariants2 = wrappedRoleAV1.getVariants(newSlot2);
+        uint256 newSlot2 = Utils.generateSlotWhenAwake(newSlot, 3);
+        assertEq(Utils.getRoleId(newSlot2), 2);
+        assertEq(Utils.getRarity(newSlot2), 1);
+        assertEq(Utils.getStyle(newSlot2), 3);
+        assertEq(Utils.getVariant(newSlot2), 3);
+        uint32[] memory oldVariants2 = Utils.getVariants(newSlot2);
 
         assertEq(oldVariants2[0], 88);
         assertEq(oldVariants2[1], 10);

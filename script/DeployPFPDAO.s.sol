@@ -116,10 +116,10 @@ contract Deploy is Script {
         require(wrappedPoolV1.getnSIdsLength() == 1);
 
         // 设置loot价格
-        wrappedPoolV1.setPriceLootOne(vm.envInt("PRICE_ONE"));
-        wrappedPoolV1.setPriceLootTen(vm.envInt("PRICE_TEN"));
-        require(wrappedPoolV1.priceLootOne() == vm.envInt("PRICE_ONE"));
-        require(wrappedPoolV1.priceLootTen() == vm.envInt("PRICE_TEN"));
+        wrappedPoolV1.setPriceLootOne(2800000);
+        wrappedPoolV1.setPriceLootTen(22000000);
+        require(wrappedPoolV1.priceLootOne() == 2800000);
+        require(wrappedPoolV1.priceLootTen() == 22000000);
 
         // 设置signer
         wrappedPoolV1.setSigner(vm.envAddress("SIGNER"));
@@ -138,7 +138,7 @@ contract Deploy is Script {
         // 设置角色和装备合约
         wrappedRoleAV1.addActivePool(address(wrappedPoolV1));
         require(wrappedRoleAV1.isActivePool(address(wrappedPoolV1)));
-        wrappedRoleAV1.setEquipmentContract(address(wrappedEquipV1));
+        // wrappedRoleAV1.setEquipmentContract(address(wrappedEquipV1));
         require(wrappedRoleAV1.equipmentContract() == address(wrappedEquipV1));
 
         wrappedEquipV1.addActivePool(address(wrappedPoolV1));

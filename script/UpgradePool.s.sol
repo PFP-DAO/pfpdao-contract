@@ -11,18 +11,49 @@ import {UUPSProxy} from "../src/UUPSProxy.sol";
 
 contract UpgradePool is Script {
     function run() public {
-        // address pool = vm.envAddress("POOL_ADDRESS");
+        address pool = vm.envAddress("POOL_ADDRESS");
         uint256 privKey = vm.envUint("PRIVATE_KEY");
-        // address roleNFTAddress_ = vm.envAddress("ROLEA_ADDRESS");
+        address roleNFTAddress_ = vm.envAddress("ROLEA_ADDRESS");
+        address treasury = vm.envAddress("TREASURY");
         // address equipmentAddress_ = vm.envAddress("EQUIP_ADDRESS");
-        address styleAddress_ = vm.envAddress("STYLE_VARIANT_MANAGER");
+        // address styleAddress_ = vm.envAddress("STYLE_VARIANT_MANAGER");
         address deployer = vm.rememberKey(privKey);
         vm.startBroadcast(deployer);
 
         // 将代理合约包装成ABI，以支持更容易的调用
-        // PFPDAOPool wrappedPoolV1 = PFPDAOPool(pool);
-        // PFPDAOPool implementationV2 = new PFPDAOPool();
-        // wrappedPoolV1.upgradeTo(address(implementationV2));
+        PFPDAOPool wrappedPool = PFPDAOPool(pool);
+        PFPDAOPool implementationV2 = new PFPDAOPool();
+        wrappedPool.upgradeTo(address(implementationV2));
+
+        PFPDAORole wrappedRoleV1 = PFPDAORole(roleNFTAddress_);
+        PFPDAORole implementationV2Role = new PFPDAORole();
+        wrappedRoleV1.upgradeTo(address(implementationV2Role));
+
+        // upgrade 0807
+        uint256 oldTreasuryBalance = address(treasury).balance;
+        require(address(wrappedPool).balance > 0 ether);
+        wrappedPool.withdraw();
+        require(address(treasury).balance - oldTreasuryBalance > 0 ether);
+
+        // upgrade 0803
+        wrappedPool.setPriceLootOne(vm.envInt("PRICE_ONE"));
+        wrappedPool.setPriceLootTen(vm.envInt("PRICE_TEN"));
+        assert(wrappedPool.priceLootOne() == vm.envInt("PRICE_ONE"));
+        assert(wrappedPool.priceLootTen() == vm.envInt("PRICE_TEN"));
+
+        wrappedPool.setRelayer(vm.envAddress("RELAYER"));
+        assert(wrappedPool.relayer() == vm.envAddress("RELAYER"));
+        wrappedPool.setSwapRouter(vm.envAddress("SWAP_ROUTER"));
+        assert(address(wrappedPool.router()) == vm.envAddress("SWAP_ROUTER"));
+        wrappedPool.setWETH(vm.envAddress("WMATIC"));
+        assert(address(wrappedPool.weth()) == vm.envAddress("WMATIC"));
+        wrappedPool.setUSDC(vm.envAddress("USDC"));
+        assert(address(wrappedPool.usdc()) == vm.envAddress("USDC"));
+        wrappedPool.setFeed(vm.envAddress("MATICUSD"));
+        console2.log("Matic/USD:", wrappedPool.getLatestPrice());
+        assert(wrappedPool.getLatestPrice() > 0);
+
+        wrappedRoleV1.addActivePool(pool);
 
         // PFPDAORole wrappedRole = PFPDAORole(roleNFTAddress_);
         // PFPDAORole implementationRole = new PFPDAORole();
@@ -36,7 +67,7 @@ contract UpgradePool is Script {
         // assert(wrappedManager.viewLastVariant(1, 2) == 1);
 
         // wrappedRole.setStyleVariantManager(address(proxyManager));
-        // wrappedPoolV1.setStyleVariantManager(address(proxyManager));
+        // wrappedPool.setStyleVariantManager(address(proxyManager));
 
         // address account, uint16 roleId, uint8 style, uint32 value
         // address scoluo = 0x15DE3d7f7180f554421A91e27eE28a542881740D;
@@ -157,35 +188,26 @@ contract UpgradePool is Script {
         // uint16[] memory nSSIds = new uint16[](0);
         // uint16[] memory nSIds = new uint16[](1);
         // nSIds[0] = 0;
-        // wrappedPoolV1.setupSSSId(upSSSId);
-        // wrappedPoolV1.setupSSIds(upSSIds);
-        // wrappedPoolV1.setnSSSIds(nSSSIds);
-        // wrappedPoolV1.setnSSIds(nSSIds);
-        // wrappedPoolV1.setnSIds(nSIds);
+        // wrappedPool.setupSSSId(upSSSId);
+        // wrappedPool.setupSSIds(upSSIds);
+        // wrappedPool.setnSSSIds(nSSSIds);
+        // wrappedPool.setnSSIds(nSSIds);
+        // wrappedPool.setnSIds(nSIds);
 
-        // wrappedPoolV1.setTreasury(vm.envAddress("TREASURY"));
-        // wrappedPoolV1.setSigner(vm.envAddress("SIGNER"));
+        wrappedPool.setTreasury(vm.envAddress("TREASURY"));
+        wrappedPool.setSigner(vm.envAddress("SIGNER"));
 
-        // wrappedPoolV1.setPriceLootOne(vm.envInt("PRICE_ONE"));
-        // wrappedPoolV1.setPriceLootTen(vm.envInt("PRICE_TEN"));
+        assert(address(wrappedPool.roleNFT()) == vm.envAddress("ROLEA_ADDRESS"));
+        assert(address(wrappedPool.equipmentNFT()) == vm.envAddress("EQUIP_ADDRESS"));
 
-        // address roleA = address(wrappedPoolV1.roleNFT());
-        // address equip = address(wrappedPoolV1.equipmentNFT());
+        assert(wrappedPool.treasury() == vm.envAddress("TREASURY"));
+        assert(wrappedPool.signer() == vm.envAddress("SIGNER"));
 
-        // assert(roleA == vm.envAddress("ROLEA_ADDRESS"));
-        // assert(equip == vm.envAddress("EQUIP_ADDRESS"));
-
-        // assert(wrappedPoolV1.priceLootOne() == vm.envInt("PRICE_ONE"));
-        // assert(wrappedPoolV1.priceLootTen() == vm.envInt("PRICE_TEN"));
-
-        // assert(wrappedPoolV1.treasury() == vm.envAddress("TREASURY"));
-        // assert(wrappedPoolV1.signer() == vm.envAddress("SIGNER"));
-
-        // assert(wrappedPoolV1.upSSSId() == 1);
-        // assert(wrappedPoolV1.getupSSIdsLength() == 3);
-        // assert(wrappedPoolV1.getnSSSIdsLength() == 0);
-        // assert(wrappedPoolV1.getnSSIdsLength() == 0);
-        // assert(wrappedPoolV1.getnSIdsLength() == 1);
+        assert(wrappedPool.upSSSId() == 1);
+        assert(wrappedPool.getupSSIdsLength() == 3);
+        assert(wrappedPool.getnSSSIdsLength() == 0);
+        assert(wrappedPool.getnSSIdsLength() == 0);
+        assert(wrappedPool.getnSIdsLength() == 1);
 
         vm.stopBroadcast();
     }
