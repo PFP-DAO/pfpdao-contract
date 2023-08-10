@@ -133,13 +133,15 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.setSigner(signer);
         wrappedPoolV1.setDividend(address(proxyDividend));
         wrappedPoolV1.setUseNewPrice(true);
+        wrappedPoolV1.setUSDC(address(wrappedUSDC));
 
         wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
 
         wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
 
-        // vm mock user1 100 eth
+        // vm mock user1 100 eth and 100 usdc
         vm.deal(user1, 100 ether);
+        wrappedUSDC.mint(user1, 100000000);
 
         // warp to 3 is bad lucky
         vm.warp(3);
@@ -300,6 +302,34 @@ contract _PFPDAOPoolTest is PRBTest {
         assertEq(newSSGuar, 7);
         assertEq(newSSSGuar, 10);
         assertEq(isUpSSS, false);
+    }
+
+    event PayLoot(address indexed user, uint256 amount, bool usdc, uint16 captainId);
+
+    function testPayLootEvent() public {
+        vm.startPrank(user1);
+        wrappedPoolV1.loot10{value: 22 ether}(false);
+        uint16 captainId = Utils.getRoleId(wrappedRoleAV1.slotOf(1));
+        vm.expectEmit(true, true, false, true);
+        emit PayLoot(user1, 2800000000000000000, false, captainId);
+        // pay matic with captain
+        wrappedPoolV1.loot1{value: 2.8 ether}(captainId, 1, false);
+
+        wrappedUSDC.approve(address(wrappedPoolV1), 56 * 10 ** 5);
+        vm.expectEmit(true, true, false, true);
+        emit PayLoot(user1, 2800000, true, captainId);
+        // pay usdc with captain
+        wrappedPoolV1.loot1(captainId, 1, true);
+
+        vm.expectEmit(true, true, false, true);
+        emit PayLoot(user1, 2800000, true, wrappedPoolV1.upSSSId());
+        // pay usdc with no captain
+        wrappedPoolV1.loot1(true);
+
+        vm.expectEmit(true, true, false, true);
+        emit PayLoot(user1, 2800000000000000000, false, wrappedPoolV1.upSSSId());
+        // pay matic with no captain
+        wrappedPoolV1.loot1{value: 2.8 ether}(false);
     }
 
     function testWhitelistLoot1() public {

@@ -72,6 +72,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
 
     event LootResult(address indexed user, uint256 slot, uint8 balance);
     event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
+    event PayLoot(address indexed user, uint256 amount, bool usdc, uint16 captainId);
 
     function initialize(address equipmentAddress_, address roleNFTAddress_) public initializer {
         __Ownable_init();
@@ -80,27 +81,31 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         equipmentNFT = PFPDAOEquipment(equipmentAddress_);
     }
 
-    modifier loot1PayVerify(bool usdc_) {
+    modifier loot1PayVerify(bool usdc_, uint16 captainId_) {
         if (usdc_) {
             bool success = usdc.transferFrom(_msgSender(), address(this), uint256(priceLootOne));
             if (!success) revert USDCPaymentFailed();
+            emit PayLoot(_msgSender(), uint256(priceLootOne), true, captainId_);
         } else {
             int256 lastPrice = _useNewPrice ? int256(10 ** 8) : getLatestPrice();
             uint256 shouldPay = uint256(priceLootOne * int256(10 ** 20) / lastPrice);
 
             if (msg.value < shouldPay) revert NotEnoughMATIC();
+            emit PayLoot(_msgSender(), msg.value, false, captainId_);
         }
         _;
     }
 
-    modifier loot10PayVerify(bool usdc_) {
+    modifier loot10PayVerify(bool usdc_, uint16 captainId_) {
         if (usdc_) {
             bool success = usdc.transferFrom(_msgSender(), address(this), uint256(priceLootTen));
             if (!success) revert USDCPaymentFailed();
+            emit PayLoot(_msgSender(), uint256(priceLootTen), true, captainId_);
         } else {
             int256 lastPrice = _useNewPrice ? int256(10 ** 8) : getLatestPrice();
             uint256 shouldPay = uint256((priceLootTen * 10 ** 20) / lastPrice);
             if (msg.value < shouldPay) revert NotEnoughMATIC();
+            emit PayLoot(_msgSender(), msg.value, false, captainId_);
         }
         _;
     }
@@ -150,11 +155,11 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         );
     }
 
-    function loot1(bool usdc_) external payable loot1PayVerify(usdc_) {
+    function loot1(bool usdc_) external payable loot1PayVerify(usdc_, upSSSId) {
         _loot1();
     }
 
-    function loot1(uint16 captainId_, uint256 nftId_, bool usdc_) external payable loot1PayVerify(usdc_) {
+    function loot1(uint16 captainId_, uint256 nftId_, bool usdc_) external payable loot1PayVerify(usdc_, captainId_) {
         dividend.claim(_msgSender(), captainId_);
         _loot1();
         roleNFT.levelUpWhenLoot(nftId_, 2);
@@ -197,11 +202,15 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         );
     }
 
-    function loot10(bool usdc_) external payable loot10PayVerify(usdc_) {
+    function loot10(bool usdc_) external payable loot10PayVerify(usdc_, upSSSId) {
         _lootN(10);
     }
 
-    function loot10(uint16 captainId_, uint256 nftId_, bool usdc_) external payable loot10PayVerify(usdc_) {
+    function loot10(uint16 captainId_, uint256 nftId_, bool usdc_)
+        external
+        payable
+        loot10PayVerify(usdc_, captainId_)
+    {
         dividend.claim(_msgSender(), captainId_);
         _lootN(10);
         roleNFT.levelUpWhenLoot(nftId_, 20);
