@@ -34,7 +34,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
 
     AggregatorV3Interface internal dataFeed;
     IDividend public dividend;
-    IPFPDAOStyleVariantManager private styleVariantManager;
+    IPFPDAOStyleVariantManager public styleVariantManager;
 
     int256 public priceLootOne;
     int256 public priceLootTen;

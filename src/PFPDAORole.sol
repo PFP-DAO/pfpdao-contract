@@ -18,7 +18,7 @@ contract PFPDAORole is PFPDAO {
     using StringsUpgradeable for uint16;
     using StringsUpgradeable for uint8;
 
-    IPFPDAOStyleVariantManager private styleVariantManager;
+    IPFPDAOStyleVariantManager public styleVariantManager;
 
     mapping(uint16 => string) public roldIdToName;
 
