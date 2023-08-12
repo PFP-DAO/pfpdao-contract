@@ -40,6 +40,11 @@ contract DeployDividend is Script {
 
         require(wrappedDividend.allowPools(initPool), "pool not allowed");
         require(wrappedDividend.rolesContracts(initRole), "role not allowed");
+
+        // should set all level 20+ roles dividend manually
+        // address user1 = 0xe4C6bFd0DDf3D82a2105F1b93578671c58Eb3871;
+        // wrappedDividend.setCaptainRight(user1, 1, 39);
+
         vm.stopBroadcast();
     }
 }

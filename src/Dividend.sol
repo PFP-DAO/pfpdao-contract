@@ -33,6 +33,8 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
 
     bool public isPaused;
 
+    mapping(uint256 => mapping(address => mapping(uint16 => bool))) public hasClaimed;
+
     event Claim(address indexed user, uint16 indexed roleId, uint256 amount, uint256 batch);
 
     modifier onlyAllowPools() {
@@ -62,27 +64,30 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
         uint256 roleBalanceTotal = batchRoleIdPoolBalance[batch][captainId_];
         uint256 roleTotalRightYesterday = batchCaptainRight[batch - 1][captainId_];
         uint256 captainRightYesterday = batchAddressCaptainRight[batch - 1][user_][captainId_];
-        uint256 captainRightToday = batchAddressCaptainRight[batch][user_][captainId_];
-        if (
-            roleBalanceTotal == 0 || roleTotalRightYesterday == 0 || captainRightYesterday == 0 || captainRightToday > 0
-        ) {
+        if (roleTotalRightYesterday == 0) {
             return 0;
         }
         return roleBalanceTotal * captainRightYesterday / roleTotalRightYesterday;
     }
 
     function claim(address user_, uint16 captainId_) public onlyAllowPools {
-        if (
-            !isPaused && batchAddressCaptainRight[batch][user_][captainId_] == 0
-                && addressCaptainRight[user_][captainId_] > 0
-        ) {
-            uint256 shouldPay = getClaimAmount(user_, captainId_);
+        if (isPaused) return;
+        uint256 captainRight = addressCaptainRight[user_][captainId_];
+        uint256 captainRightForTomorrow = batchAddressCaptainRight[batch][user_][captainId_];
 
-            //然后读取当前addressCaptainWeight，修改今日batch的batchAddressCaptainRight和batchCaptainRight
-            batchCaptainRight[batch][captainId_] += addressCaptainRight[user_][captainId_];
-            batchAddressCaptainRight[batch][user_][captainId_] += addressCaptainRight[user_][captainId_];
+        // captainRight may change between multiple loots in a batch, so update the difference
+        if (captainRight > captainRightForTomorrow) {
+            uint256 increment = captainRight - captainRightForTomorrow;
+            batchCaptainRight[batch][captainId_] += increment;
+            batchAddressCaptainRight[batch][user_][captainId_] += increment;
+        }
+
+        // seperate the right setting tomorrow and claim dividend today
+        if (hasClaimed[batch][user_][captainId_]) return;
+        uint256 shouldPay = getClaimAmount(user_, captainId_);
+        if (shouldPay > 0) {
             lastClaimedTimestamp[user_][captainId_] = block.timestamp;
-
+            hasClaimed[batch][user_][captainId_] = true;
             _transferDividendTo(user_, shouldPay, captainId_);
         }
     }
@@ -96,7 +101,7 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
         emit Claim(to_, roleId_, amount_, batch);
     }
 
-    function setCaptainRight(address user_, uint16 captainId_, uint256 newRight_) public onlyRoles {
+    function setCaptainRight(address user_, uint16 captainId_, uint256 newRight_) external onlyOwner {
         uint256 oldAddressCaptainRight = addressCaptainRight[user_][captainId_];
         addressCaptainRight[user_][captainId_] = newRight_;
         captainRightDenominator[captainId_] += (newRight_ - oldAddressCaptainRight);
@@ -109,6 +114,9 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
 
     function transferCaptainRight(address from_, address to_, uint16 captainId_, uint256 right_) public onlyRoles {
         addressCaptainRight[from_][captainId_] -= right_;
+        if (batchAddressCaptainRight[batch][from_][captainId_] > 0) {
+            batchAddressCaptainRight[batch][from_][captainId_] -= right_;
+        }
         addressCaptainRight[to_][captainId_] += right_;
     }
 
