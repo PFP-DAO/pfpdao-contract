@@ -97,7 +97,7 @@ contract PFPDAORole is PFPDAO {
         if (level > 19 && level > oldLevel) {
             uint256 slot = slotOf(nftId_);
             uint256 newRight = (level - oldLevel) * (Utils.getStyle(slot) - 1) * Utils.getSpecial(level);
-            dividend.addCaptainRight(_msgSender(), Utils.getRoleId(slot), newRight);
+            dividend.addCaptainRight(ownerOf(nftId_), Utils.getRoleId(slot), newRight);
         }
         return (level, exp, overflowExp);
     }

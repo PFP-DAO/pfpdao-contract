@@ -706,4 +706,15 @@ contract _DividendTest is PRBTest {
         assertEq(wrappedDividend.batchAddressCaptainRight(2, user2, 3), 20);
         assertEq(wrappedDividend.batchCaptainRight(2, 3), 60);
     }
+
+    function testLevelUpChangeWeight() public {
+        wrappedRoleAV1.setRoleLevelAndExp(1, 20, 60);
+        assertEq(wrappedDividend.addressCaptainRight(user1, 3), 40);
+        assertEq(wrappedRoleAV1.getLevel(1), 20);
+        vm.prank(user1);
+        wrappedPoolV1.loot1{value: 2.8 ether}(3, 1, false); // level up 20 to 21
+        assertEq(wrappedDividend.addressCaptainRight(user1, 3), 41);
+        assertEq(wrappedDividend.addressCaptainRight(address(wrappedPoolV1), 3), 0);
+        assertEq(wrappedRoleAV1.getLevel(1), 21);
+    }
 }
