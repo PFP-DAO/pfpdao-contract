@@ -36,79 +36,22 @@ contract PFPDAORole is PFPDAO {
     event LevelResult(uint256 indexed nftId, uint8 newLevel, uint32 newExp);
     event AwakeResult(uint256 indexed nftId, uint32 oldVariant, uint32 newVariant, uint8 newStyle);
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(string calldata name_, string calldata symbol_) public initializer {
         __PFPDAO_init(name_, symbol_);
     }
 
-    function airdrop(address[] calldata to_, uint16 roldId_, uint8 rarity_) public onlyOwner {
-        for (uint256 i = 0; i < to_.length; i++) {
-            uint32 variant = styleVariantManager.getRoleAwakenVariant(to_[i], roldId_, 1);
-            uint256 newSlot = Utils.generateSlot(roldId_, rarity_, variant, 1);
-            _mint(to_[i], newSlot, 1);
-        }
-    }
+    /* external functions */
 
-    function mint(address to_, uint256 slot_) public {
-        if (!activePools[_msgSender()]) {
-            revert NotAllowed();
-        }
-        uint256 tokenId = _mint(to_, slot_, 1);
-        exps[tokenId].level = 1;
-        exps[tokenId].exp = 0;
-    }
-
-    function getLevel(uint256 nftId_) public view returns (uint8) {
-        return exps[nftId_].level == 0 ? 1 : exps[nftId_].level;
-    }
-
-    function getExp(uint256 nftId_) public view returns (uint32) {
-        return exps[nftId_].exp;
-    }
-
-    function _addExp(uint256 nftId_, uint32 exp_) private view returns (uint8, uint8, uint32, uint32) {
-        uint8 oldLevel = getLevel(nftId_);
-        uint32 oldExp = getExp(nftId_);
-        uint32 newExp = oldExp + exp_;
-        uint8 newLevel = oldLevel;
-        uint32 overflowExp = 0;
-
-        while (newExp >= expTable[newLevel - 1]) {
-            newExp -= expTable[newLevel - 1];
-            overflowExp = newExp;
-            newLevel++;
-
-            for (uint256 i = 0; i < levelNeedAwakening.length; i++) {
-                if (levelNeedAwakening[i] == newLevel) {
-                    uint8 tmpOldLevel = newLevel - 1;
-                    uint32 needLevelExp = expTable[tmpOldLevel - 1];
-                    overflowExp = newExp;
-                    return (oldLevel, tmpOldLevel, needLevelExp, overflowExp);
-                }
-            }
-        }
-        return (oldLevel, newLevel, newExp, 0);
-    }
-
-    function _levelUp(uint256 nftId_, uint32 addExp_) private returns (uint8, uint32, uint32) {
-        (uint8 oldLevel, uint8 level, uint32 exp, uint32 overflowExp) = _addExp(nftId_, addExp_);
-        exps[nftId_].level = level;
-        exps[nftId_].exp = exp;
-        emit LevelResult(nftId_, level, exp);
-        if (level > 19 && level > oldLevel) {
-            uint256 slot = slotOf(nftId_);
-            uint256 newRight = (level - oldLevel) * (Utils.getStyle(slot) - 1) * Utils.getSpecial(level);
-            dividend.addCaptainRight(ownerOf(nftId_), Utils.getRoleId(slot), newRight);
-        }
-        return (level, exp, overflowExp);
-    }
-
-    function levelUpWhenLoot(uint256 nftId_, uint32 addExp_) public returns (uint8, uint32, uint32) {
-        if (!activePools[_msgSender()]) {
-            revert NotAllowed();
-        }
-        return _levelUp(nftId_, addExp_);
-    }
-
+    /// burn equipments to level up, 1 equipment = 8 exp
+    /// @param nftId_ role nft id
+    /// @param equipmentIds equipment nft ids
+    /// @return level
+    /// @return exp
+    /// @return overflowExp
     function levelUpByBurnEquipments(uint256 nftId_, uint256[] calldata equipmentIds)
         external
         returns (uint8, uint32, uint32)
@@ -132,6 +75,9 @@ contract PFPDAORole is PFPDAO {
         return _levelUp(nftId_, totalExp);
     }
 
+    /// Awake role to next awaken level by burn level 1 same roles, need 1, 2, 4, 8, 16 roles
+    /// @param nftId_ role nft id to awake
+    /// @param burnNftIds_ role nft ids to burn
     function awake(uint256 nftId_, uint256[] memory burnNftIds_) external returns (uint256) {
         uint256 slot = slotOf(nftId_);
         uint16 roleId = Utils.getRoleId(slot);
@@ -179,6 +125,39 @@ contract PFPDAORole is PFPDAO {
         return newSlot;
     }
 
+    /* public functions */
+    function levelUpWhenLoot(uint256 nftId_, uint32 addExp_) public returns (uint8, uint32, uint32) {
+        if (!activePools[_msgSender()]) {
+            revert NotAllowed();
+        }
+        return _levelUp(nftId_, addExp_);
+    }
+
+    function airdrop(address[] calldata to_, uint16 roldId_, uint8 rarity_) public onlyOwner {
+        for (uint256 i = 0; i < to_.length; i++) {
+            uint32 variant = styleVariantManager.getRoleAwakenVariant(to_[i], roldId_, 1);
+            uint256 newSlot = Utils.generateSlot(roldId_, rarity_, variant, 1);
+            _mint(to_[i], newSlot, 1);
+        }
+    }
+
+    function mint(address to_, uint256 slot_) public {
+        if (!activePools[_msgSender()]) {
+            revert NotAllowed();
+        }
+        uint256 tokenId = _mint(to_, slot_, 1);
+        exps[tokenId].level = 1;
+        exps[tokenId].exp = 0;
+    }
+
+    function getLevel(uint256 nftId_) public view returns (uint8) {
+        return exps[nftId_].level == 0 ? 1 : exps[nftId_].level;
+    }
+
+    function getExp(uint256 nftId_) public view returns (uint32) {
+        return exps[nftId_].exp;
+    }
+
     function tokenURI(uint256 tokenId_) public view virtual override returns (string memory) {
         _requireMinted(tokenId_);
         uint256 slot = slotOf(tokenId_);
@@ -204,6 +183,7 @@ contract PFPDAORole is PFPDAO {
         );
     }
 
+    /* admin functions */
     function setRoleName(uint16 roleId_, string calldata name_) public onlyOwner {
         roldIdToName[roleId_] = name_;
     }
@@ -230,6 +210,44 @@ contract PFPDAORole is PFPDAO {
             uint256 newRight = Utils.getSpecial(level_) * level_ * Utils.getAwaken(level_);
             dividend.addCaptainRight(ownerOf(nftId_), Utils.getRoleId(slotOf(nftId_)), newRight - oldRight);
         }
+    }
+
+    /* private functions */
+    function _levelUp(uint256 nftId_, uint32 addExp_) private returns (uint8, uint32, uint32) {
+        (uint8 oldLevel, uint8 level, uint32 exp, uint32 overflowExp) = _addExp(nftId_, addExp_);
+        exps[nftId_].level = level;
+        exps[nftId_].exp = exp;
+        emit LevelResult(nftId_, level, exp);
+        if (level > 19 && level > oldLevel) {
+            uint256 slot = slotOf(nftId_);
+            uint256 newRight = (level - oldLevel) * (Utils.getStyle(slot) - 1) * Utils.getSpecial(level);
+            dividend.addCaptainRight(ownerOf(nftId_), Utils.getRoleId(slot), newRight);
+        }
+        return (level, exp, overflowExp);
+    }
+
+    function _addExp(uint256 nftId_, uint32 exp_) private view returns (uint8, uint8, uint32, uint32) {
+        uint8 oldLevel = getLevel(nftId_);
+        uint32 oldExp = getExp(nftId_);
+        uint32 newExp = oldExp + exp_;
+        uint8 newLevel = oldLevel;
+        uint32 overflowExp = 0;
+
+        while (newExp >= expTable[newLevel - 1]) {
+            newExp -= expTable[newLevel - 1];
+            overflowExp = newExp;
+            newLevel++;
+
+            for (uint256 i = 0; i < levelNeedAwakening.length; i++) {
+                if (levelNeedAwakening[i] == newLevel) {
+                    uint8 tmpOldLevel = newLevel - 1;
+                    uint32 needLevelExp = expTable[tmpOldLevel - 1];
+                    overflowExp = newExp;
+                    return (oldLevel, tmpOldLevel, needLevelExp, overflowExp);
+                }
+            }
+        }
+        return (oldLevel, newLevel, newExp, 0);
     }
 
     function _beforeValueTransfer(

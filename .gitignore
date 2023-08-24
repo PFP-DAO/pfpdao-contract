@@ -18,3 +18,6 @@ docs/
 
 .DS_Store
 data
+
+*.py
+*.json

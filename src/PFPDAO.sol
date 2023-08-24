@@ -17,14 +17,17 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
     uint32[89] public expTable;
     uint8[] public levelNeedAwakening;
 
-    // approved pools
     mapping(address => bool) public activePools;
 
     address[] public allowedBurners;
 
     modifier onlyActivePool() {
-        require(activePools[msg.sender], "only active pool can mint");
+        require(activePools[_msgSender()], "only active pool can mint");
         _;
+    }
+
+    constructor() {
+        _disableInitializers();
     }
 
     function __PFPDAO_init(string memory name_, string memory symbol_) internal onlyInitializing {
@@ -134,13 +137,17 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
     }
 
     function burn(uint256 tokenId_) public {
-        if (!isAllowedBurner(_msgSender())) {
+        if (!_isAllowedBurner(_msgSender())) {
             revert NotBurner(_msgSender());
         }
         _burn(tokenId_);
     }
 
-    function isAllowedBurner(address _address) private view returns (bool) {
+    function getAllowedBurner(uint256 index_) public view returns (address) {
+        return allowedBurners[index_];
+    }
+
+    function _isAllowedBurner(address _address) private view returns (bool) {
         for (uint256 i = 0; i < allowedBurners.length; i++) {
             if (allowedBurners[i] == _address) {
                 return true;
@@ -149,15 +156,11 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
         return false;
     }
 
-    function getAllowedBurner(uint256 index_) public view returns (address) {
-        return allowedBurners[index_];
-    }
-
+    /* admin functions */
     function updateAllowedBurners(address[] calldata _allowedBurners) external onlyOwner {
         allowedBurners = _allowedBurners;
     }
 
-    /* admin functions */
     function addActivePool(address pool_) external onlyOwner {
         activePools[pool_] = true;
     }

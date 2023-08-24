@@ -419,7 +419,7 @@ contract _DividendTest is PRBTest {
         vm.expectRevert(NotAllowed.selector);
         wrappedDividend.addCaptainRight(user1, 1, 10000);
         vm.prank(user1);
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert("Ownable: caller is not the owner");
         wrappedDividend.setCaptainRight(user1, 1, 10000);
     }
 

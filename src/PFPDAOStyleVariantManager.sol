@@ -18,6 +18,15 @@ contract PFPDAOStyleVariantManager is
     mapping(address => mapping(uint16 => mapping(uint8 => uint32))) public addressToStyleVariant;
     mapping(uint16 => mapping(uint8 => uint32)) public lastStyleVariant;
 
+    modifier onlyAllowedCaller() {
+        require(hasRole(ALLOWED_CALLER_ROLE, _msgSender()), "Caller is not allowed");
+        _;
+    }
+
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address pool_, address role_) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -26,11 +35,35 @@ contract PFPDAOStyleVariantManager is
         _setupRole(ALLOWED_CALLER_ROLE, role_);
     }
 
-    modifier onlyAllowedCaller() {
-        require(hasRole(ALLOWED_CALLER_ROLE, _msgSender()), "Caller is not allowed");
-        _;
+    /// @notice Returns the variant of a character's image for a given address, role, and style.
+    ///         Each address can only have a fixed character variant (image) per role and style.
+    ///         The function increments the variant counter and assigns it to the address if not already assigned.
+    /// @dev Can only be called by allowed callers (e.g., loot, awake, or airdrop contracts).
+    /// @param account_ The user's address for which to get the variant.
+    /// @param roleId_ The role ID of the character.
+    /// @param style_ The art style associated with the character's awaken level.
+    /// @return The variant of the character's image for the given address, role, and style.
+    function getRoleAwakenVariant(address account_, uint16 roleId_, uint8 style_)
+        public
+        onlyAllowedCaller
+        returns (uint32)
+    {
+        if (addressToStyleVariant[account_][roleId_][style_] == 0) {
+            lastStyleVariant[roleId_][style_] += 1;
+            addressToStyleVariant[account_][roleId_][style_] = lastStyleVariant[roleId_][style_];
+        }
+        return addressToStyleVariant[account_][roleId_][style_];
     }
 
+    function viewRoleAwakenVariant(address account_, uint16 roleId_, uint8 style_) public view returns (uint32) {
+        return addressToStyleVariant[account_][roleId_][style_];
+    }
+
+    function viewLastVariant(uint16 roleId_, uint8 style_) public view returns (uint32) {
+        return lastStyleVariant[roleId_][style_];
+    }
+
+    /* admin functions */
     function grantAllowedCallerRole(address newCaller) public onlyRole(ADMIN_ROLE) {
         grantRole(ALLOWED_CALLER_ROLE, newCaller);
     }
@@ -43,26 +76,7 @@ contract PFPDAOStyleVariantManager is
         lastStyleVariant[roleId][style] = value;
     }
 
-    function getRoleAwakenVariant(address account, uint16 roleId, uint8 style)
-        public
-        onlyAllowedCaller
-        returns (uint32)
-    {
-        if (addressToStyleVariant[account][roleId][style] == 0) {
-            lastStyleVariant[roleId][style] += 1;
-            addressToStyleVariant[account][roleId][style] = lastStyleVariant[roleId][style];
-        }
-        return addressToStyleVariant[account][roleId][style];
-    }
-
-    function viewRoleAwakenVariant(address account, uint16 roleId, uint8 style) public view returns (uint32) {
-        return addressToStyleVariant[account][roleId][style];
-    }
-
-    function viewLastVariant(uint16 roleId, uint8 style) public view returns (uint32) {
-        return lastStyleVariant[roleId][style];
-    }
-
+    /* upgrade functions */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(ADMIN_ROLE) {}
 
     uint256[50] private __gap;
