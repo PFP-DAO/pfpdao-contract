@@ -7,11 +7,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "erc-3525/ERC3525Upgradeable.sol";
-
-error IsNotOwner();
-error Soulbound();
-error NotApprove();
-error NotBurner(address);
+import {Errors} from "./libraries/Errors.sol";
 
 contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC3525Upgradeable, UUPSUpgradeable {
     uint32[89] public expTable;
@@ -138,7 +134,7 @@ contract PFPDAO is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC352
 
     function burn(uint256 tokenId_) public {
         if (!_isAllowedBurner(_msgSender())) {
-            revert NotBurner(_msgSender());
+            revert Errors.NotBurner(_msgSender());
         }
         _burn(tokenId_);
     }

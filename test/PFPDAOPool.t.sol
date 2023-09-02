@@ -9,10 +9,10 @@ import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/SignatureCheckerUpgradeable.sol";
 
 import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
-import {PFPDAOPool, WhiteListUsed, InvalidSignature} from "../src/PFPDAOPool.sol";
+import {PFPDAOPool} from "../src/PFPDAOPool.sol";
+import {Errors} from "../src/libraries/Errors.sol";
 import {PFPDAOEquipMetadataDescriptor} from "../src/PFPDAOEquipMetadataDescriptor.sol";
 import {PFPDAORole} from "../src/PFPDAORole.sol";
-import {Soulbound} from "../src/PFPDAO.sol";
 import {PFPDAOStyleVariantManager} from "../src/PFPDAOStyleVariantManager.sol";
 import {FiatToken} from "../src/FiatToken.sol";
 import {Utils} from "../src/libraries/Utils.sol";
@@ -132,7 +132,7 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.setTreasury(treasury);
         wrappedPoolV1.setSigner(signer);
         wrappedPoolV1.setDividend(address(proxyDividend));
-        wrappedPoolV1.setUseNewPrice(true);
+        wrappedPoolV1.setUseNewPrice(false);
         wrappedPoolV1.setUSDC(address(wrappedUSDC));
 
         wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
@@ -350,7 +350,7 @@ contract _PFPDAOPoolTest is PRBTest {
         assertEq(wrappedRoleAV1.balanceOf(user1), 1);
 
         // mint with same signature should revert
-        vm.expectRevert(abi.encodeWithSelector(WhiteListUsed.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(Errors.WhiteListUsed.selector, 1));
         wrappedPoolV1.whitelistLoot(10, signature);
 
         // test view
@@ -367,7 +367,7 @@ contract _PFPDAOPoolTest is PRBTest {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(user1);
-        vm.expectRevert(InvalidSignature.selector);
+        vm.expectRevert(Errors.InvalidSignature.selector);
         wrappedPoolV1.whitelistLoot(10, signature);
     }
 
@@ -380,7 +380,7 @@ contract _PFPDAOPoolTest is PRBTest {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(user2);
-        vm.expectRevert(InvalidSignature.selector);
+        vm.expectRevert(Errors.InvalidSignature.selector);
         wrappedPoolV1.whitelistLoot(10, signature);
     }
 
@@ -393,7 +393,7 @@ contract _PFPDAOPoolTest is PRBTest {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(user1);
-        vm.expectRevert(InvalidSignature.selector);
+        vm.expectRevert(Errors.InvalidSignature.selector);
         wrappedPoolV1.whitelistLoot(5, signature); // have 10 freeloot but only use 5
     }
 
@@ -413,7 +413,7 @@ contract _PFPDAOPoolTest is PRBTest {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.prank(user);
-        vm.expectRevert(InvalidSignature.selector);
+        vm.expectRevert(Errors.InvalidSignature.selector);
         wrappedPoolV1.whitelistLoot(1, signature);
     }
 

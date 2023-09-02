@@ -20,12 +20,9 @@ import {IDividend} from "./IDividend.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {Errors} from "./libraries/Errors.sol";
 
-contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract PFPDAOCommonPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
     using ECDSAUpgradeable for bytes32;
     using SignatureCheckerUpgradeable for address;
-
-    // Replacing original variables from PFPDAORoleVariantManager with a storage gap of 52 slots
-    uint256[49] private ___gap;
 
     AggregatorV3Interface internal dataFeed;
     IDividend public dividend;
@@ -34,36 +31,22 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     int256 public priceLootOne;
     int256 public priceLootTen;
 
-    mapping(address => uint8) public mintTimesForUpSS;
+    mapping(address => uint8) public mintTimesForSS;
     mapping(address => uint8) public mintTimesForSSS;
-    mapping(address => bool) public nextIsUpSSS;
 
     // When deploying the pool, the equipment address and the character NFT address should be specified.
     PFPDAOEquipment public equipmentNFT;
     PFPDAORole public roleNFT;
 
-    uint16 public upSSSId;
-    uint16[] private __unusedArray;
-    uint16[] public upSSIds;
-    uint16[] public nSSSIds;
-    uint16[] public nSSIds;
-    uint16[] public nSIds;
-
-    // 50% of the funds go into the pool associated with the character.
-    mapping(uint16 => uint256) public oldRoleIdPoolBalance;
-    uint16 _defaultRoleIdForNewUser; // deprecated
-
-    mapping(address => bool) public oldFreeLooted; // deprecated
-    mapping(address => uint8) public isWhitelistLooted;
-
-    uint8 public activeNonce;
-    address public signer;
     address public treasury;
     address public relayer;
     IUniswapV2Router02 public router;
     IWETH public weth;
     IERC20 public usdc;
     bool private _useNewPrice;
+
+    uint16[] public nSSSIds;
+    uint16[] public nSSIds;
 
     event LootResult(address indexed user, uint256 slot, uint8 balance);
     event GuarResult(address indexed user, uint8 newSSGuar, uint8 newSSSGuar, bool isUpSSS);
@@ -108,41 +91,39 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         _disableInitializers();
     }
 
-    function initialize(address equipmentAddress_, address roleNFTAddress_) public initializer {
+    function initialize(address[] memory addresses_, int256 priceOne_, int256 priceTen_) public initializer {
         __Ownable_init();
         __UUPSUpgradeable_init();
-        roleNFT = PFPDAORole(roleNFTAddress_);
-        equipmentNFT = PFPDAOEquipment(equipmentAddress_);
+
+        roleNFT = PFPDAORole(addresses_[0]);
+        equipmentNFT = PFPDAOEquipment(addresses_[1]);
+        styleVariantManager = IPFPDAOStyleVariantManager(addresses_[2]);
+        treasury = addresses_[3];
+        router = IUniswapV2Router02(addresses_[4]);
+        weth = IWETH(addresses_[5]);
+        usdc = IERC20(addresses_[6]);
+        dataFeed = AggregatorV3Interface(addresses_[7]);
+        dividend = IDividend(addresses_[8]);
+
+        priceLootOne = priceOne_;
+        priceLootTen = priceTen_;
+
+        uint16[] memory sssIds = new uint16[](1);
+        sssIds[0] = 1;
+        nSSSIds = sssIds;
+
+        uint16[] memory ssIds = new uint16[](3);
+        ssIds[0] = 2;
+        ssIds[1] = 3;
+        ssIds[2] = 4;
+        nSSIds = ssIds;
     }
 
     /* external functions */
 
-    /// whiltelist address can free loot with signature
-    /// @param time_ loot times
-    /// @param signature_ the signature get from server
-    function whitelistLoot(uint8 time_, bytes calldata signature_) external {
-        if (isWhitelistLooted[_msgSender()] == activeNonce) {
-            revert Errors.WhiteListUsed(activeNonce);
-        }
-        if (time_ == 0 || time_ > 10) {
-            revert Errors.InvaildLootTimes();
-        }
-        bytes32 digest = keccak256(abi.encodePacked(_msgSender(), time_, activeNonce)).toEthSignedMessageHash();
-        if (!signer.isValidSignatureNow(digest, signature_)) {
-            revert Errors.InvalidSignature();
-        }
-        if (time_ == 1) {
-            _loot1();
-        } else {
-            _lootN(time_);
-        }
-
-        isWhitelistLooted[_msgSender()] = activeNonce;
-    }
-
     /// loot once without captain
     /// @param usdc_ is pay USDC
-    function loot1(bool usdc_) external payable loot1PayVerify(usdc_, upSSSId) {
+    function loot1(bool usdc_) external payable loot1PayVerify(usdc_, 1) {
         _loot1();
     }
 
@@ -158,7 +139,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
 
     /// loot ten without captain
     /// @param usdc_ is pay USDC
-    function loot10(bool usdc_) external payable loot10PayVerify(usdc_, upSSSId) {
+    function loot10(bool usdc_) external payable loot10PayVerify(usdc_, 1) {
         _lootN(10);
     }
 
@@ -181,7 +162,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     /// @param roleIds_ all roles id
     /// @param roleIdPoolBalanceToday_ roles revenue today, computed by web3 function use events
     function dailyDivide(uint16[] calldata roleIds_, uint256[] calldata roleIdPoolBalanceToday_) external onlyRelayer {
-        require(1 + upSSIds.length + nSSSIds.length + nSSIds.length == roleIds_.length, "Need all roleIds");
+        require(nSSSIds.length + nSSIds.length == roleIds_.length, "Need all roleIds");
         require(roleIds_.length == roleIdPoolBalanceToday_.length, "RoleIds length isn't equal balance's");
 
         uint256 maticBalance = address(this).balance;
@@ -196,21 +177,15 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
             require(toDividendDone && toTreasuryDone, "USDC transfer failed");
         }
 
-        uint256 activeBatch = dividend.batch();
-        uint256 newBatch = activeBatch + 1;
+        uint256 activeBatch = dividend.batch(); // Need update up pool first and use newest batch
         for (uint256 i = 0; i < roleIds_.length; i++) {
-            dividend.updateRoleIdPoolBalance(newBatch, roleIds_[i], roleIdPoolBalanceToday_[i]);
+            dividend.updateRoleIdPoolBalance(activeBatch, roleIds_[i], roleIdPoolBalanceToday_[i]);
         }
-        dividend.setNewBatch();
     }
 
     /* public functions */
-    function getGuarInfo(address user_) public view returns (uint8, uint8, bool) {
-        return (mintTimesForUpSS[user_], mintTimesForSSS[user_], nextIsUpSSS[user_]);
-    }
-
-    function getupSSIdsLength() public view returns (uint256) {
-        return upSSIds.length;
+    function getGuarInfo(address user_) public view returns (uint8, uint8) {
+        return (mintTimesForSS[user_], mintTimesForSSS[user_]);
     }
 
     function getnSSSIdsLength() public view returns (uint256) {
@@ -219,10 +194,6 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
 
     function getnSSIdsLength() public view returns (uint256) {
         return nSSIds.length;
-    }
-
-    function getnSIdsLength() public view returns (uint256) {
-        return nSIds.length;
     }
 
     function getLatestPrice() public view returns (int256) {
@@ -241,9 +212,7 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         }
 
         emit LootResult(_msgSender(), tmpSlot, 1);
-        emit GuarResult(
-            _msgSender(), mintTimesForUpSS[_msgSender()], mintTimesForSSS[_msgSender()], nextIsUpSSS[_msgSender()]
-        );
+        emit GuarResult(_msgSender(), mintTimesForSS[_msgSender()], mintTimesForSSS[_msgSender()], false);
     }
 
     function _lootN(uint8 time_) private {
@@ -278,93 +247,49 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
             emit LootResult(_msgSender(), tmpSlot, tmpBalance);
         }
 
-        emit GuarResult(
-            _msgSender(), mintTimesForUpSS[_msgSender()], mintTimesForSSS[_msgSender()], nextIsUpSSS[_msgSender()]
-        );
+        emit GuarResult(_msgSender(), mintTimesForSS[_msgSender()], mintTimesForSSS[_msgSender()], false);
     }
 
     function _mintLogic(uint8 time_) private returns (uint256) {
         uint16 roleId = 0;
         uint8 rarity = 0;
-        uint256 upSSCount = upSSIds.length;
         uint256 nSSSCount = nSSSIds.length;
         uint256 nSSCount = nSSIds.length;
 
         uint256 seed = uint256(keccak256(abi.encodePacked(_msgSender(), block.timestamp, time_)));
-        // Random number judgment. First check the legendary character guarantee, then the character guarantee, and finally the 10-draw guarantee.
-        // 1. Legendary character guarantee: If a **Legendary** character is drawn and it is not the current up character, the next **Legendary** character drawn will definitely be the current up character.
-        // 2. Character guarantee: Every 90 draws will definitely get a **Legendary** character.
-        // 3. 10-draw guarantee: After 10 draws, there will definitely be a rare character. 3/4 of the time it will be the current up character, and 1/4 of the time it will be a permanent pool character.
 
         unchecked {
-            if (nextIsUpSSS[_msgSender()]) {
-                // Legendary Up character guarantee
-                roleId = upSSSId;
-                rarity = 2;
-                nextIsUpSSS[_msgSender()] = false;
-                mintTimesForSSS[_msgSender()] = 0;
-                mintTimesForUpSS[_msgSender()] += 1;
-            } else if (mintTimesForSSS[_msgSender()] == 89) {
+            if (mintTimesForSSS[_msgSender()] == 89) {
                 // Legendary guarantee
-                if (nSSSCount == 0) {
-                    // if only 1 up SSS character
-                    roleId = upSSSId;
-                } else if (seed % 2 == 0) {
-                    // 1/2 chance to get up SSS character
-                    roleId = upSSSId;
-                } else {
-                    roleId = nSSSIds[seed % nSSSCount];
-                }
-                // Legendary Up character guarantee
-                if (roleId != upSSSId) {
-                    nextIsUpSSS[_msgSender()] = true;
-                }
+                roleId = nSSSIds[seed % nSSSCount];
                 rarity = 2;
                 mintTimesForSSS[_msgSender()] = 0;
-                mintTimesForUpSS[_msgSender()] += 1;
-            } else if (mintTimesForUpSS[_msgSender()] >= 9) {
+                mintTimesForSS[_msgSender()] += 1;
+            } else if (mintTimesForSS[_msgSender()] >= 9) {
                 // Rare guarantee
-                if (nSSCount == 0) {
-                    // if only up SS characters
-                    roleId = upSSIds[seed % upSSCount];
-                } else if (seed % (upSSCount + 1) == 0) {
-                    // if upSSCount is 3, 1/4 chance to get normal SS character
-                    roleId = nSSIds[seed % nSSCount];
-                } else {
-                    // 3/4 chance to get up SS character
-                    roleId = upSSIds[seed % upSSCount];
-                }
+                roleId = nSSIds[seed % nSSCount];
                 rarity = 1;
-                mintTimesForUpSS[_msgSender()] = 0;
                 mintTimesForSSS[_msgSender()] += 1;
+                mintTimesForSS[_msgSender()] = 0;
             } else {
                 // 1% Legendary, 10% Rare, 89% Common
                 uint8 randomValue = uint8(seed % 100);
                 if (randomValue < 1) {
-                    uint256 index = seed % (nSSSCount + 1);
-                    if (nSSSCount == 0 || index == 0) {
-                        roleId = upSSSId;
-                    } else {
-                        // pure random for legendary, only 0 is up legendary
-                        roleId = nSSSIds[index - 1];
-                    }
+                    // Legendary Random
+                    roleId = nSSSIds[seed % nSSSCount];
                     rarity = 2;
                     mintTimesForSSS[_msgSender()] = 0;
-                    mintTimesForUpSS[_msgSender()] += 1;
+                    mintTimesForSS[_msgSender()] += 1;
                 } else if (randomValue < 11) {
-                    uint256 index = seed % (upSSCount + nSSCount);
-                    if (index < upSSCount) {
-                        // pure random for up rare, only less than upSSCount is up rare
-                        roleId = upSSIds[index];
-                    } else {
-                        roleId = nSSIds[index - upSSCount];
-                    }
+                    // Rare Random
+                    roleId = nSSIds[seed % nSSCount];
                     rarity = 1;
                     mintTimesForSSS[_msgSender()] += 1;
-                    mintTimesForUpSS[_msgSender()] = 0;
+                    mintTimesForSS[_msgSender()] = 0;
                 } else {
+                    // Common
                     mintTimesForSSS[_msgSender()] += 1;
-                    mintTimesForUpSS[_msgSender()] += 1;
+                    mintTimesForSS[_msgSender()] += 1;
                 }
             }
         }
@@ -385,17 +310,6 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
     }
 
     /* admin functions */
-    function setupSSSId(uint16 upSSSId_) external onlyOwner {
-        upSSSId = upSSSId_;
-    }
-
-    function setupSSIds(uint16[] memory upSSIds_) external onlyOwner {
-        upSSIds = new uint16[](upSSIds_.length);
-        for (uint256 i = 0; i < upSSIds_.length; i++) {
-            upSSIds[i] = upSSIds_[i];
-        }
-    }
-
     function setnSSSIds(uint16[] memory nSSSIds_) external onlyOwner {
         nSSSIds = new uint16[](nSSSIds_.length);
         for (uint256 i = 0; i < nSSSIds_.length; i++) {
@@ -410,39 +324,8 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         }
     }
 
-    function setnSIds(uint16[] memory nSIds_) external onlyOwner {
-        nSIds = new uint16[](nSIds_.length);
-        for (uint256 i = 0; i < nSIds_.length; i++) {
-            nSIds[i] = nSIds_[i];
-        }
-    }
-
-    function setUseNewPrice(bool useNewPrice_) external onlyOwner {
-        _useNewPrice = useNewPrice_;
-    }
-
     function setRelayer(address relayer_) external onlyOwner {
         relayer = relayer_;
-    }
-
-    function setSwapRouter(address router_) external onlyOwner {
-        router = IUniswapV2Router02(router_);
-    }
-
-    function setWETH(address weth_) external onlyOwner {
-        weth = IWETH(weth_);
-    }
-
-    function setUSDC(address usdc_) external onlyOwner {
-        usdc = IERC20(usdc_);
-    }
-
-    function setFeed(address oracle_) external onlyOwner {
-        dataFeed = AggregatorV3Interface(oracle_);
-    }
-
-    function setActiveNonce(uint8 nonce_) external onlyOwner {
-        activeNonce = nonce_;
     }
 
     function withdraw() external onlyOwner {
@@ -455,24 +338,12 @@ contract PFPDAOPool is Initializable, ContextUpgradeable, OwnableUpgradeable, UU
         treasury = treasury_;
     }
 
-    function setSigner(address signer_) external onlyOwner {
-        signer = signer_;
-    }
-
-    function setPriceLootOne(int256 price_) external onlyOwner {
-        priceLootOne = price_;
-    }
-
-    function setPriceLootTen(int256 price_) external onlyOwner {
-        priceLootTen = price_;
-    }
-
-    function setStyleVariantManager(address variantManager_) external onlyOwner {
-        styleVariantManager = IPFPDAOStyleVariantManager(variantManager_);
-    }
-
     function setDividend(address dividend_) external onlyOwner {
         dividend = IDividend(dividend_);
+    }
+
+    function setUseNewPrice(bool useNewPrice_) external onlyOwner {
+        _useNewPrice = useNewPrice_;
     }
 
     /* upgradeable functions */

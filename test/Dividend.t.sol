@@ -4,10 +4,11 @@ pragma solidity ^0.8.18;
 import {PRBTest} from "@prb/test/PRBTest.sol";
 import "forge-std/console2.sol";
 
-import {PFPDAOEquipment, NotBurner} from "../src/PFPDAOEquipment.sol";
-import {PFPDAOPool, NotEnoughMATIC} from "../src/PFPDAOPool.sol";
+import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
+import {PFPDAOPool} from "../src/PFPDAOPool.sol";
+import {Errors} from "../src/libraries/Errors.sol";
 import {PFPDAOEquipMetadataDescriptor} from "../src/PFPDAOEquipMetadataDescriptor.sol";
-import {PFPDAORole, Soulbound, InvalidSlot, NotAllowed, NotOwner} from "../src/PFPDAORole.sol";
+import {PFPDAORole} from "../src/PFPDAORole.sol";
 import {PFPDAOStyleVariantManager} from "../src/PFPDAOStyleVariantManager.sol";
 import {Dividend} from "../src/Dividend.sol";
 import {IERC20} from "@uniswap/periphery/interfaces/IERC20.sol";
@@ -146,7 +147,7 @@ contract _DividendTest is PRBTest {
         wrappedPoolV1.setFeed(oracle);
         wrappedPoolV1.setRelayer(address(relayer));
         wrappedPoolV1.setSwapRouter(address(swapRouter));
-        wrappedPoolV1.setUseNewPrice(true);
+        wrappedPoolV1.setUseNewPrice(false);
 
         wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
         wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
@@ -408,15 +409,15 @@ contract _DividendTest is PRBTest {
     }
 
     function testOnlyAllowPools() public {
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert(Errors.NotAllowed.selector);
         wrappedDividend.claim(user1, 1);
         vm.prank(user1);
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert(Errors.NotAllowed.selector);
         wrappedDividend.claim(user1, 1);
     }
 
     function testOnlyRoles() public {
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert(Errors.NotAllowed.selector);
         wrappedDividend.addCaptainRight(user1, 1, 10000);
         vm.prank(user1);
         vm.expectRevert("Ownable: caller is not the owner");
@@ -556,8 +557,8 @@ contract _DividendTest is PRBTest {
         wrappedPoolV1.loot10{value: 22 ether}(3, 1, false);
         uint256 userMaticBalance = address(user2).balance;
 
-        wrappedPoolV1.setUseNewPrice(false);
-        vm.expectRevert(NotEnoughMATIC.selector);
+        wrappedPoolV1.setUseNewPrice(true);
+        vm.expectRevert(Errors.NotEnoughMATIC.selector);
         vm.startPrank(user2);
         wrappedPoolV1.loot10{value: 22 ether}(3, 1, false); // new method need 30+ matic (22/maticusd)
 
@@ -604,6 +605,7 @@ contract _DividendTest is PRBTest {
         roleIds4[1] = 2;
         roleIds4[2] = 3;
         roleIds4[3] = 4;
+        vm.stopPrank();
 
         vm.prank(relayer);
         wrappedPoolV1.dailyDivide(roleIds4, roleIdPoolBalanceToday);

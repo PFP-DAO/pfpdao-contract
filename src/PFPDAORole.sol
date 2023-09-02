@@ -6,12 +6,6 @@ import {Utils} from "./libraries/Utils.sol";
 import {IPFPDAOStyleVariantManager} from "./IPFPDAOStyleVariantManager.sol";
 import {IDividend} from "./IDividend.sol";
 
-error InvalidSlot();
-error NotReachLimit(uint8);
-error NotAllowed();
-error NotOwner();
-error InvalidLength();
-
 contract PFPDAORole is PFPDAO {
     using StringsUpgradeable for uint256;
     using StringsUpgradeable for uint32;
@@ -57,16 +51,16 @@ contract PFPDAORole is PFPDAO {
         returns (uint8, uint32, uint32)
     {
         if (equipmentIds.length == 0) {
-            revert InvalidLength();
+            revert Errors.InvalidLength();
         }
         if (ownerOf(nftId_) != _msgSender()) {
-            revert NotOwner();
+            revert Errors.NotOwner();
         }
         uint32 totalExp = 0;
         PFPDAO equip = PFPDAO(equipmentContract);
         for (uint256 i = 0; i < equipmentIds.length; i++) {
             if (equip.ownerOf(equipmentIds[i]) != _msgSender()) {
-                revert NotOwner();
+                revert Errors.NotOwner();
             }
             uint256 balance = equip.balanceOf(equipmentIds[i]);
             equip.burn(equipmentIds[i]);
@@ -86,24 +80,24 @@ contract PFPDAORole is PFPDAO {
         uint32 exp = getExp(nftId_);
 
         if (burnNftIds_.length != 2 ** (style - 1)) {
-            revert InvalidLength();
+            revert Errors.InvalidLength();
         }
 
         for (uint256 i; i < burnNftIds_.length; i++) {
             uint256 toBurnId = burnNftIds_[i];
             if (ownerOf(toBurnId) != _msgSender()) {
-                revert NotOwner();
+                revert Errors.NotOwner();
             }
             uint256 burnNftSlot_ = slotOf(toBurnId);
 
             if (roleId != Utils.getRoleId(burnNftSlot_)) {
-                revert InvalidSlot();
+                revert Errors.InvalidSlot();
             }
             _burn(toBurnId);
         }
 
         if (!Utils.cantLevelup(level, exp)) {
-            revert NotReachLimit(level);
+            revert Errors.NotReachLimit(level);
         }
 
         uint32 newVariant = styleVariantManager.getRoleAwakenVariant(_msgSender(), roleId, style + 1);
@@ -128,7 +122,7 @@ contract PFPDAORole is PFPDAO {
     /* public functions */
     function levelUpWhenLoot(uint256 nftId_, uint32 addExp_) public returns (uint8, uint32, uint32) {
         if (!activePools[_msgSender()]) {
-            revert NotAllowed();
+            revert Errors.NotAllowed();
         }
         return _levelUp(nftId_, addExp_);
     }
@@ -141,13 +135,15 @@ contract PFPDAORole is PFPDAO {
         }
     }
 
-    function mint(address to_, uint256 slot_) public {
+    function mint(address to_, uint256 slot_, uint256 amount_) public {
         if (!activePools[_msgSender()]) {
-            revert NotAllowed();
+            revert Errors.NotAllowed();
         }
-        uint256 tokenId = _mint(to_, slot_, 1);
-        exps[tokenId].level = 1;
-        exps[tokenId].exp = 0;
+        for (uint256 i = 0; i < amount_; i++) {
+            uint256 tokenId = _mint(to_, slot_, 1);
+            exps[tokenId].level = 1;
+            exps[tokenId].exp = 0;
+        }
     }
 
     function getLevel(uint256 nftId_) public view returns (uint8) {
@@ -262,7 +258,7 @@ contract PFPDAORole is PFPDAO {
         uint8 level = getLevel(fromTokenId_);
         if (from_ != address(0) && to_ != address(0)) {
             if (level < 60) {
-                revert Soulbound();
+                revert Errors.Soulbound();
             } else {
                 uint256 rightToTransfer = Utils.getSpecial(level) * level * Utils.getAwaken(level);
                 dividend.transferCaptainRight(from_, to_, Utils.getRoleId(slot_), rightToTransfer);

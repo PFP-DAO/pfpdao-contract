@@ -4,10 +4,11 @@ pragma solidity ^0.8.18;
 import {PRBTest} from "@prb/test/PRBTest.sol";
 import "forge-std/console2.sol";
 
-import {PFPDAOEquipment, NotBurner} from "../src/PFPDAOEquipment.sol";
+import {PFPDAOEquipment} from "../src/PFPDAOEquipment.sol";
 import {PFPDAOPool} from "../src/PFPDAOPool.sol";
 import {PFPDAOEquipMetadataDescriptor} from "../src/PFPDAOEquipMetadataDescriptor.sol";
-import {PFPDAORole, Soulbound, InvalidSlot, NotAllowed, NotOwner, InvalidLength} from "../src/PFPDAORole.sol";
+import {PFPDAORole} from "../src/PFPDAORole.sol";
+import {Errors} from "../src/libraries/Errors.sol";
 import {PFPDAOStyleVariantManager} from "../src/PFPDAOStyleVariantManager.sol";
 import {Dividend} from "../src/Dividend.sol";
 import {FiatToken} from "../src/FiatToken.sol";
@@ -92,7 +93,7 @@ contract _PFPDAOTest is PRBTest {
         wrappedRoleBV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedDividend.initialize(address(wrappedUSDC), address(wrappedPoolV1), address(wrappedRoleAV1));
         wrappedUSDC.initialize();
-        wrappedPoolV1.setUseNewPrice(true);
+        wrappedPoolV1.setUseNewPrice(false);
 
         // 第一期有4个角色，0是装备，1是legendary, 2-4是rare
         uint16 upSSSId = 1;
@@ -175,10 +176,10 @@ contract _PFPDAOTest is PRBTest {
         vm.startPrank(user1);
         wrappedPoolV1.loot10{value: 22 ether}(false);
 
-        vm.expectRevert(Soulbound.selector);
+        vm.expectRevert(Errors.Soulbound.selector);
         wrappedRoleAV1.safeTransferFrom(user1, user2, 1);
 
-        vm.expectRevert(Soulbound.selector);
+        vm.expectRevert(Errors.Soulbound.selector);
         wrappedRoleAV1.transferFrom(user1, user2, 1);
 
         // vm.expectRevert(Soulbound.selector);
@@ -243,7 +244,7 @@ contract _PFPDAOTest is PRBTest {
     function testLevelUp() public {
         vm.startPrank(user1);
         wrappedPoolV1.loot10{value: 22 ether}(false);
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert(Errors.NotAllowed.selector);
         wrappedRoleAV1.levelUpWhenLoot(1, 1);
     }
 
@@ -262,7 +263,7 @@ contract _PFPDAOTest is PRBTest {
         vm.startPrank(user1);
         wrappedPoolV1.loot10{value: 22 ether}(false);
         // if no allowed burner, revert
-        vm.expectRevert(abi.encodeWithSelector(NotBurner.selector, user1));
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotBurner.selector, user1));
         wrappedEquipV1.burn(1);
     }
 
@@ -333,7 +334,7 @@ contract _PFPDAOTest is PRBTest {
 
         // equipmentIds is empty
         uint256[] memory equipmentIdsEmpty = new uint256[](0);
-        vm.expectRevert(InvalidLength.selector);
+        vm.expectRevert(Errors.InvalidLength.selector);
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsEmpty);
 
         uint256[] memory equipmentIdsUser1 = new uint256[](1);
@@ -341,12 +342,12 @@ contract _PFPDAOTest is PRBTest {
 
         // user2 levelup use user1's equipment
         vm.prank(user2);
-        vm.expectRevert(NotOwner.selector);
+        vm.expectRevert(Errors.NotOwner.selector);
         wrappedRoleAV1.levelUpByBurnEquipments(2, equipmentIdsUser1);
 
         // user1 levelup NFT belong to user2
         vm.prank(user1);
-        vm.expectRevert(NotOwner.selector);
+        vm.expectRevert(Errors.NotOwner.selector);
         wrappedRoleAV1.levelUpByBurnEquipments(2, equipmentIdsUser1);
 
         // user1 levelup NFT not exist
@@ -357,7 +358,7 @@ contract _PFPDAOTest is PRBTest {
         // user1 levelup use burned equipments
         vm.prank(user1);
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsUser1);
-        vm.expectRevert(NotOwner.selector);
+        vm.expectRevert(Errors.NotOwner.selector);
         wrappedRoleAV1.levelUpByBurnEquipments(1, equipmentIdsUser1);
     }
 

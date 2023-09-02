@@ -5,9 +5,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Errors} from "./libraries/Errors.sol";
 import "./IDividend.sol";
-
-error NotAllowed();
 
 contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDividend {
     mapping(uint16 => uint256) public roleIdPoolBalance; // Total balance of a role pool
@@ -39,14 +38,14 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
 
     modifier onlyAllowPools() {
         if (!allowPools[_msgSender()]) {
-            revert NotAllowed();
+            revert Errors.NotAllowed();
         }
         _;
     }
 
     modifier onlyRoles() {
         if (!rolesContracts[_msgSender()]) {
-            revert NotAllowed();
+            revert Errors.NotAllowed();
         }
         _;
     }
@@ -94,6 +93,7 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
         if (shouldPay > 0) {
             lastClaimedTimestamp[user_][captainId_] = block.timestamp;
             hasClaimed[batch_][user_][captainId_] = true;
+            batchRoleIdPoolBalance[batch_][captainId_] -= shouldPay;
             _transferDividendTo(user_, shouldPay, captainId_);
         }
     }
@@ -130,7 +130,7 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
 
     function getClaimAmount(address user_, uint16 captainId_) public view returns (uint256) {
         uint256 batch_ = batch;
-        uint256 roleBalanceTotal = batchRoleIdPoolBalance[batch_][captainId_];
+        uint256 roleBalanceTotal = roleIdPoolBalance[captainId_] / 49;
         uint256 roleTotalRightYesterday = batchCaptainRight[batch_ - 1][captainId_];
         uint256 captainRightYesterday = batchAddressCaptainRight[batch_ - 1][user_][captainId_];
         if (roleTotalRightYesterday == 0) {
@@ -172,6 +172,14 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
 
     function setPause(bool pause_) external onlyOwner {
         isPaused = pause_;
+    }
+
+    function setAllowPool(address pool_, bool allow_) external onlyOwner {
+        allowPools[pool_] = allow_;
+    }
+
+    function setRolesContract(address role_, bool allow_) external onlyOwner {
+        rolesContracts[role_] = allow_;
     }
 
     /* upgrade functions */

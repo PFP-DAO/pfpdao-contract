@@ -64,8 +64,8 @@ contract PFPDAOStyleVariantManager is
     }
 
     /* admin functions */
-    function grantAllowedCallerRole(address newCaller) public onlyRole(ADMIN_ROLE) {
-        grantRole(ALLOWED_CALLER_ROLE, newCaller);
+    function grantRole(bytes32 role_, address newRole_) public override onlyRole(ADMIN_ROLE) {
+        _grantRole(role_, newRole_);
     }
 
     function setAddressToStyleVariant(address account, uint16 roleId, uint8 style, uint32 value)
