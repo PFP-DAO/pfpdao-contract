@@ -21,3 +21,6 @@ data
 
 *.py
 *.json
+*.sh
+
+script/
