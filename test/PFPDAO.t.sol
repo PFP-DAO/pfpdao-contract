@@ -37,7 +37,6 @@ contract _PFPDAOTest is PRBTest {
     PFPDAOPool wrappedPoolV1;
     PFPDAOEquipment wrappedEquipV1;
     PFPDAORole wrappedRoleAV1;
-    PFPDAORole wrappedRoleBV1;
     PFPDAOEquipMetadataDescriptor wrappedMetadataDescriptor;
     PFPDAOStyleVariantManager wrappedStyleManagerV1;
     Dividend wrappedDividend;
@@ -76,7 +75,6 @@ contract _PFPDAOTest is PRBTest {
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
-        wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
         wrappedMetadataDescriptor = PFPDAOEquipMetadataDescriptor(address(proxyMetadataDescriptor));
         wrappedStyleManagerV1 = PFPDAOStyleVariantManager(address(proxyStyleManager));
         wrappedDividend = Dividend(address(proxyDividend));
@@ -86,11 +84,10 @@ contract _PFPDAOTest is PRBTest {
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedPoolV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedEquipV1.initialize();
-        wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
-        wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
+        wrappedRoleAV1.initialize(
+            "PFPDAORoleA", "PFPRA", address(wrappedDividend), address(wrappedEquipV1), address(wrappedStyleManagerV1)
+        );
         wrappedStyleManagerV1.initialize(address(wrappedPoolV1), address(wrappedRoleAV1));
-        wrappedRoleAV1.setStyleVariantManager(address(proxyStyleManager));
-        wrappedRoleBV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedDividend.initialize(address(wrappedUSDC), address(wrappedPoolV1), address(wrappedRoleAV1));
         wrappedUSDC.initialize();
         wrappedPoolV1.setUseNewPrice(false);
@@ -116,16 +113,9 @@ contract _PFPDAOTest is PRBTest {
         wrappedEquipV1.addActivePool(address(proxyPool));
         wrappedRoleAV1.addActivePool(address(proxyPool));
 
-        wrappedRoleAV1.setRoleName(1, "Linger");
-        wrappedRoleAV1.setRoleName(2, "Kazuki");
-        wrappedRoleAV1.setRoleName(3, "Mila");
-        wrappedRoleAV1.setRoleName(4, "Mico");
-
         wrappedPoolV1.setTreasury(treasury);
         wrappedPoolV1.setSigner(signer);
         wrappedPoolV1.setDividend(address(proxyDividend));
-
-        wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
 
         wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
 
@@ -146,14 +136,6 @@ contract _PFPDAOTest is PRBTest {
         assertEq(wrappedEquipV1.symbol(), "PFPE");
         assertEq(wrappedRoleAV1.symbol(), "PFPRA");
         assertEq(wrappedRoleAV1.name(), "PFPDAORoleA");
-        assertEq(wrappedRoleBV1.symbol(), "PFPRB");
-    }
-
-    function testRoleName() public {
-        assertEq(wrappedRoleAV1.roldIdToName(1), "Linger");
-        assertEq(wrappedRoleAV1.roldIdToName(2), "Kazuki");
-        assertEq(wrappedRoleAV1.roldIdToName(3), "Mila");
-        assertEq(wrappedRoleAV1.roldIdToName(4), "Mico");
     }
 
     // Test Role function
@@ -196,14 +178,14 @@ contract _PFPDAOTest is PRBTest {
         _loot10GetARole();
 
         string memory roleUri = wrappedRoleAV1.tokenURI(1);
-        assertEq(roleUri, "https://pfpdao-0.4everland.store/metadata/4/V1_0/role_4_V1_0_1_Mico.json");
+        assertEq(roleUri, "https://pfpdao-0.4everland.store/metadata/4/0/1");
 
         vm.deal(user2, 22 ether);
         vm.prank(user2);
         vm.warp(6);
         wrappedPoolV1.loot10{value: 22 ether}(false);
         string memory roleUri2 = wrappedRoleAV1.tokenURI(2); // This will be Mico
-        assertEq(roleUri2, "https://pfpdao-0.4everland.store/metadata/4/V1_0/role_4_V1_0_2_Mico.json");
+        assertEq(roleUri2, "https://pfpdao-0.4everland.store/metadata/4/0/2");
     }
 
     // function testAirdrop() public {

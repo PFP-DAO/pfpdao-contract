@@ -95,10 +95,10 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedPoolV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedEquipV1.initialize();
-        wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
-        wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
+        wrappedRoleAV1.initialize(
+            "PFPDAORoleA", "PFPRA", address(wrappedDividend), address(wrappedEquipV1), address(wrappedStyleManagerV1)
+        );
         wrappedStyleManagerV1.initialize(address(wrappedPoolV1), address(wrappedRoleAV1));
-        wrappedRoleAV1.setStyleVariantManager(address(proxyStyleManager));
         // wrappedRoleBV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedDividend.initialize(address(wrappedUSDC), address(wrappedPoolV1), address(wrappedRoleAV1));
         wrappedUSDC.initialize();
@@ -124,18 +124,11 @@ contract _PFPDAOPoolTest is PRBTest {
         wrappedEquipV1.addActivePool(address(proxyPool));
         wrappedRoleAV1.addActivePool(address(proxyPool));
 
-        wrappedRoleAV1.setRoleName(1, "Linger");
-        wrappedRoleAV1.setRoleName(2, "Kazuki");
-        wrappedRoleAV1.setRoleName(3, "Mila");
-        wrappedRoleAV1.setRoleName(4, "Mico");
-
         wrappedPoolV1.setTreasury(treasury);
         wrappedPoolV1.setSigner(signer);
         wrappedPoolV1.setDividend(address(proxyDividend));
         wrappedPoolV1.setUseNewPrice(false);
         wrappedPoolV1.setUSDC(address(wrappedUSDC));
-
-        wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
 
         wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
 
@@ -450,7 +443,7 @@ contract _PFPDAOPoolTest is PRBTest {
         assertEq(wrappedRoleAV1.tokenURI(2), wrappedRoleAV1.tokenURI(3));
         assertEq(wrappedRoleAV1.tokenURI(3), wrappedRoleAV1.tokenURI(4));
         assertEq(
-            keccak256(abi.encode("https://pfpdao-0.4everland.store/metadata/2/V1_0/role_2_V1_0_1_Kazuki.json")),
+            keccak256(abi.encode("https://pfpdao-0.4everland.store/metadata/2/0/1")),
             keccak256(abi.encode(wrappedRoleAV1.tokenURI(4)))
         );
 
@@ -461,7 +454,7 @@ contract _PFPDAOPoolTest is PRBTest {
         vm.startPrank(user2);
         wrappedPoolV1.loot10{value: 22 ether}(false);
         assertEq(
-            keccak256(abi.encode("https://pfpdao-0.4everland.store/metadata/2/V1_0/role_2_V1_0_2_Kazuki.json")),
+            keccak256(abi.encode("https://pfpdao-0.4everland.store/metadata/2/0/2")),
             keccak256(abi.encode(wrappedRoleAV1.tokenURI(5)))
         );
 

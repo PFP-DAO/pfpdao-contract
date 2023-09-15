@@ -46,7 +46,6 @@ contract _DividendTest is PRBTest {
     PFPDAOPool wrappedPoolV1;
     PFPDAOEquipment wrappedEquipV1;
     PFPDAORole wrappedRoleAV1;
-    PFPDAORole wrappedRoleBV1;
     PFPDAOEquipMetadataDescriptor wrappedMetadataDescriptor;
     PFPDAOStyleVariantManager wrappedStyleManagerV1;
     Dividend wrappedDividend;
@@ -95,7 +94,6 @@ contract _DividendTest is PRBTest {
         wrappedPoolV1 = PFPDAOPool(address(proxyPool));
         wrappedEquipV1 = PFPDAOEquipment(address(proxyEquip));
         wrappedRoleAV1 = PFPDAORole(address(proxyRoleA));
-        wrappedRoleBV1 = PFPDAORole(address(proxyRoleB));
         wrappedMetadataDescriptor = PFPDAOEquipMetadataDescriptor(address(proxyMetadataDescriptor));
         wrappedStyleManagerV1 = PFPDAOStyleVariantManager(address(proxyStyleManager));
         wrappedDividend = Dividend(address(proxyDividend));
@@ -104,11 +102,10 @@ contract _DividendTest is PRBTest {
         wrappedPoolV1.initialize(address(proxyEquip), address(proxyRoleA));
         wrappedPoolV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedEquipV1.initialize();
-        wrappedRoleAV1.initialize("PFPDAORoleA", "PFPRA");
-        wrappedRoleBV1.initialize("PFPDAORoleB", "PFPRB");
+        wrappedRoleAV1.initialize(
+            "PFPDAORoleA", "PFPRA", address(wrappedDividend), address(wrappedEquipV1), address(wrappedStyleManagerV1)
+        );
         wrappedStyleManagerV1.initialize(address(wrappedPoolV1), address(wrappedRoleAV1));
-        wrappedRoleAV1.setStyleVariantManager(address(proxyStyleManager));
-        wrappedRoleBV1.setStyleVariantManager(address(proxyStyleManager));
         wrappedDividend.initialize(address(usdc), address(wrappedPoolV1), address(wrappedRoleAV1));
 
         dataFeed = AggregatorV3Interface(oracle);
@@ -134,11 +131,6 @@ contract _DividendTest is PRBTest {
         wrappedEquipV1.addActivePool(address(proxyPool));
         wrappedRoleAV1.addActivePool(address(proxyPool));
 
-        wrappedRoleAV1.setRoleName(1, "Linger");
-        wrappedRoleAV1.setRoleName(2, "Kazuki");
-        wrappedRoleAV1.setRoleName(3, "Mila");
-        wrappedRoleAV1.setRoleName(4, "Mico");
-
         wrappedPoolV1.setTreasury(treasury);
         wrappedPoolV1.setSigner(signer);
         wrappedPoolV1.setDividend(address(proxyDividend));
@@ -149,9 +141,7 @@ contract _DividendTest is PRBTest {
         wrappedPoolV1.setSwapRouter(address(swapRouter));
         wrappedPoolV1.setUseNewPrice(false);
 
-        wrappedRoleAV1.setEquipmentContract(address(proxyEquip));
         wrappedEquipV1.setMetadataDescriptor(address(proxyMetadataDescriptor));
-        wrappedRoleAV1.setDividend(address(proxyDividend));
 
         address[] memory allowedBurners = new address[](1);
         allowedBurners[0] = address(wrappedRoleAV1);

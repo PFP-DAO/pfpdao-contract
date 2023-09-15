@@ -9,29 +9,60 @@ import {Errors} from "./libraries/Errors.sol";
 import "./IDividend.sol";
 
 contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDividend {
-    mapping(uint16 => uint256) public roleIdPoolBalance; // Total balance of a role pool
+    /// @notice Total balance of a role pool
+    ///      Key: roleId
+    ///      Value: pool balance of a role
+    mapping(uint16 => uint256) public roleIdPoolBalance;
 
-    mapping(uint16 => uint256) public captainRightDenominator; // Total weight of a role
+    /// @notice Total weight of a role
+    ///      Key: roleId
+    ///      Value: captain totoal right
+    mapping(uint16 => uint256) public captainRightDenominator;
 
-    mapping(address => mapping(uint16 => uint256)) public addressCaptainRight; // Total weight of a role for a specific address
+    /// @notice Total weight of a role for a specific address
+    ///      Key: address => roldId
+    ///      Value: address captain totoal right
+    mapping(address => mapping(uint16 => uint256)) public addressCaptainRight;
 
-    mapping(address => mapping(uint16 => uint256)) public lastClaimedTimestamp; // Last claimed timestamp for a role by an address
+    /// @notice Last claimed timestamp for a role by an address
+    ///      Key: address => roleId
+    ///      Value: last claimed timestamp of a role by an address
+    mapping(address => mapping(uint16 => uint256)) public lastClaimedTimestamp;
 
-    mapping(uint256 => mapping(address => mapping(uint16 => uint256))) public batchAddressCaptainRight; // Rights of a role for an address on a specific day
+    /// @notice Rights of a role for an address on a specific day
+    ///      Key: batch => address => roleId
+    ///      Value: batch captain right
+    mapping(uint256 => mapping(address => mapping(uint16 => uint256))) public batchAddressCaptainRight;
 
-    mapping(uint256 => mapping(uint16 => uint256)) public batchCaptainRight; // Total rights of a role on a specific day
+    /// @notice Total rights of a role on a specific day
+    ///      Key: batch => roleId
+    ///      Value: batch captain right
+    mapping(uint256 => mapping(uint16 => uint256)) public batchCaptainRight;
 
-    mapping(uint256 => mapping(uint16 => uint256)) public batchRoleIdPoolBalance; // Balance of a role pool for a specific batch
+    /// @notice Balance of a role pool for a specific batch
+    ///      Key: batch => roleId
+    ///      Value: batch role pool balance
+    mapping(uint256 => mapping(uint16 => uint256)) public batchRoleIdPoolBalance;
 
     uint256 public batch;
 
     IERC20 public usdcAddress;
 
+    /// @notice Allow pools to call claim
+    ///      Key: pool address
+    ///      Value: allow or not
     mapping(address => bool) public allowPools;
+
+    /// @notice Allow roles to call claim
+    ///      Key: role address
+    ///      Value: allow or not
     mapping(address => bool) public rolesContracts;
 
     bool public isPaused;
 
+    /// @notice Whether a user has claimed a role pool today
+    ///      Key: batch => address => roleId
+    ///      Value: has claimed or not today for a role by an address
     mapping(uint256 => mapping(address => mapping(uint16 => bool))) public hasClaimed;
 
     event Claim(address indexed user, uint16 indexed roleId, uint256 amount, uint256 batch);
@@ -153,6 +184,14 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
         return lastClaimedTimestamp[user_][captainId_];
     }
 
+    function getRolePoolBalances(uint16[] calldata captionIds_) public view returns (uint256[] memory) {
+        uint256[] memory balances = new uint256[](captionIds_.length);
+        for (uint256 i = 0; i < captionIds_.length; i++) {
+            balances[i] = roleIdPoolBalance[captionIds_[i]];
+        }
+        return balances;
+    }
+
     /* private functions */
     function _transferDividendTo(address to_, uint256 amount_, uint16 roleId_) private {
         // transfer USDC amount to to_
@@ -167,7 +206,11 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
     function setCaptainRight(address user_, uint16 captainId_, uint256 newRight_) external onlyOwner {
         uint256 oldAddressCaptainRight = addressCaptainRight[user_][captainId_];
         addressCaptainRight[user_][captainId_] = newRight_;
-        captainRightDenominator[captainId_] += (newRight_ - oldAddressCaptainRight);
+        if (newRight_ > oldAddressCaptainRight) {
+            captainRightDenominator[captainId_] += (newRight_ - oldAddressCaptainRight);
+        } else {
+            captainRightDenominator[captainId_] -= (oldAddressCaptainRight - newRight_);
+        }
     }
 
     function setPause(bool pause_) external onlyOwner {
