@@ -225,6 +225,13 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
         rolesContracts[role_] = allow_;
     }
 
+    function addRolePoolBalance(uint16[] calldata roleIds_, uint256[] calldata amounts_) external onlyOwner {
+        require(roleIds_.length == amounts_.length, "roleIds and amounts length not match");
+        for (uint256 i = 0; i < roleIds_.length; i++) {
+            roleIdPoolBalance[roleIds_[i]] += amounts_[i];
+        }
+    }
+
     /* upgrade functions */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
