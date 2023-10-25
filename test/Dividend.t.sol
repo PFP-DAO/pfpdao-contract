@@ -153,15 +153,15 @@ contract _DividendTest is PRBTest {
 
         address[] memory to1 = new address[](1);
         to1[0] = user1;
-        wrappedRoleAV1.airdrop(to1, 3, 1);
-        wrappedRoleAV1.airdrop(to1, 3, 1);
-        wrappedRoleAV1.airdrop(to1, 3, 1);
-        wrappedRoleAV1.airdrop(to1, 3, 1);
+        uint16[] memory roleId1 = new uint16[](1);
+        roleId1[0] = 3;
+        wrappedRoleAV1.airdrop(to1, roleId1, 4, 1);
 
         address[] memory to2 = new address[](1);
         to2[0] = user2;
-        wrappedRoleAV1.airdrop(to2, 3, 1);
-        wrappedRoleAV1.airdrop(to2, 3, 1);
+        uint16[] memory roleId2 = new uint16[](1);
+        roleId1[0] = 3;
+        wrappedRoleAV1.airdrop(to1, roleId2, 2, 1);
 
         wrappedRoleAV1.setRoleLevelAndExp(1, 19, 56); // upgrade to 19 56
         wrappedRoleAV1.setRoleLevelAndExp(3, 19, 56); // upgrade to 19 56
@@ -253,9 +253,9 @@ contract _DividendTest is PRBTest {
     function testAwakeChangeRightSS() public {
         address[] memory to = new address[](1);
         to[0] = user1;
-        for (uint256 i = 0; i < 14; i++) {
-            wrappedRoleAV1.airdrop(to, 3, 1);
-        }
+        uint16[] memory roleId3 = new uint16[](1);
+        roleId3[0] = 3;
+        wrappedRoleAV1.airdrop(to, roleId3, 14, 1);
 
         wrappedRoleAV1.setRoleLevelAndExp(1, 39, 374);
         assertEq(wrappedDividend.captainRightDenominator(3), 39 + 20 + 20);
@@ -309,9 +309,9 @@ contract _DividendTest is PRBTest {
         address[] memory to = new address[](1);
         to[0] = user1;
         // burn 1 2 4 8 16 to 90, start from 7
-        for (uint256 i = 0; i < 32; i++) {
-            wrappedRoleAV1.airdrop(to, 1, 2);
-        }
+        uint16[] memory roleId4 = new uint16[](1);
+        roleId4[0] = 3;
+        wrappedRoleAV1.airdrop(to, roleId4, 32, 2);
 
         uint256 mainId = 7;
 

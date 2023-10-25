@@ -160,10 +160,22 @@ contract PFPDAORole is PFPDAO {
     }
 
     /* admin functions for test*/
-    function airdrop(address[] calldata to_, uint16 roldId_, uint8 rarity_) public onlyOwner {
+    function airdrop(address[] calldata to_, uint16[] calldata roldIds_, uint256 amount_, uint8 rarity_)
+        public
+        onlyOwner
+    {
         for (uint256 i = 0; i < to_.length; i++) {
-            uint32 variant = styleVariantManager.getRoleAwakenVariant(to_[i], roldId_, 1);
-            _mint(to_[i], Utils.generateSlot(roldId_, rarity_, variant, 1), 1);
+            for (uint256 j = 0; j < roldIds_.length; j++) {
+                for (uint256 k = 0; k < amount_; k++) {
+                    address to = to_[i];
+                    uint16 role = roldIds_[j];
+                    _mint(
+                        to,
+                        Utils.generateSlot(role, rarity_, styleVariantManager.getRoleAwakenVariant(to, role, 1), 1),
+                        1
+                    );
+                }
+            }
         }
     }
 

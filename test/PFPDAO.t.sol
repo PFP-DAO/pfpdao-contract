@@ -349,7 +349,9 @@ contract _PFPDAOTest is PRBTest {
 
         address[] memory recipients = new address[](1);
         recipients[0] = user1;
-        wrappedRoleAV1.airdrop(recipients, 3, 1);
+        uint16[] memory roleIds = new uint16[](1);
+        roleIds[0] = 3;
+        wrappedRoleAV1.airdrop(recipients, roleIds, 1, 1);
 
         vm.startPrank(user1);
         wrappedPoolV1.loot1{value: 2.8 ether}(false);

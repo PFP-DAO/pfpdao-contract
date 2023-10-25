@@ -33,7 +33,7 @@ contract PFPDAOEquipMetadataDescriptor is ERC3525MetadataDescriptorUpgradeable, 
 
     function _tokenProperties(uint256 tokenId_) internal view override returns (string memory) {
         IERC3525MetadataUpgradeable erc3525 = IERC3525MetadataUpgradeable(msg.sender);
-        return string(abi.encodePacked("{", '"balance":', erc3525.balanceOf(tokenId_).toString(), "}"));
+        return string(abi.encodePacked("{", '"balance":', (erc3525.balanceOf(tokenId_) * 8).toString(), "}"));
     }
 
     /* upgrade functions */
