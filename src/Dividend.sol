@@ -164,10 +164,10 @@ contract Dividend is Initializable, OwnableUpgradeable, UUPSUpgradeable, IDivide
         uint256 roleBalanceTotal = roleIdPoolBalance[captainId_] / 49;
         uint256 roleTotalRightYesterday = batchCaptainRight[batch_ - 1][captainId_];
         uint256 captainRightYesterday = batchAddressCaptainRight[batch_ - 1][user_][captainId_];
-        if (roleTotalRightYesterday == 0) {
+        if (roleTotalRightYesterday == 0 || captainRightYesterday == 0) {
             return 0;
         }
-        return roleBalanceTotal * captainRightYesterday / roleTotalRightYesterday;
+        return roleBalanceTotal * captainRightYesterday / roleTotalRightYesterday - 1;
     }
 
     function getRightByRole(address user_, uint16 captainId_) public view returns (uint256) {
